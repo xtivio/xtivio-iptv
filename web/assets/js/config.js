@@ -22,7 +22,7 @@ var APP_CONFIG = {
     // ("xtivio-androidNN") any more, since this config.js is the shared web
     // layer used by Android, webOS, and Tizen alike; the old name implied
     // otherwise.
-    INSTALL_TOKEN: 'xtivio-1.0.12.9a',
+    INSTALL_TOKEN: 'xtivio-1.0.12.9',
 
     // Direct (sideload) build only. '' = store build: no updater, nothing shown. Set to
     // 'direct' at staging for the APK hosted on your own server; Settings then shows
@@ -61,9 +61,6 @@ var APP_CONFIG = {
 
     // Android: an HLS stream that ExoPlayer has not made ready after this many ms is handed to the WebView player (hls.js).
     EXO_STUCK_MS: 4000,
-    // Start-up deadline: a stream with no sign of life after this long shows the "no answer in time" error (E-TIME).
-    START_DEADLINE_LIVE_MS: 12000,
-    START_DEADLINE_VOD_MS: 25000,
 
     // Debug mode - extra logging when true. OFF for this build. Flip back to
     // true for any future dev/diagnostic round; nothing else needs to change

@@ -29,14 +29,6 @@ var Player = (function () {
     var triedExoStuck = false;
     var webFirstPending = '';
     var exoStuckTimer = null;
-    /* Start-up deadline. A stream that never reports a first sign of life (a provider that holds the
-     * connection open, or answers with something no engine reports back, such as a 407 from a provider that
-     * blocks the stream) used to leave the spinner up for as long as the engines kept retrying. play() arms
-     * this; any showLoading(false) (first picture, manifest parsed, an error) disarms it. When it fires, the
-     * engines are stopped and the error screen shows the "no answer in time" sentence with code E-TIME.
-     * Live gets less time than movies and series, which can need longer to open. Both values are in config.js. */
-    var startWd = null;
-    var startWdGen = 0;
     var WEBFIRST_LS = 'xtivio.webfirst';
     var WEBFIRST_TTL = 14 * 86400000;
     var exoOfferable = false;      // the last Exo failure was a decoder/format one another app may handle
@@ -309,7 +301,6 @@ var Player = (function () {
     var exoPictureUp = false;
     function showLoading(on) {
         if (!loadingEl) return;
-        if (!on) clearStartWd();
         if (!on && activeEngine === 'exo') exoPictureUp = true;
         if (on) loadingEl.classList.remove('hidden');
         else loadingEl.classList.add('hidden');
@@ -678,27 +669,6 @@ var Player = (function () {
     }
     function webFirstDel(u) {
         try { var o = webFirstLoad(); delete o[streamKey(u)]; localStorage.setItem(WEBFIRST_LS, JSON.stringify(o)); } catch (e) {}
-    }
-    function clearStartWd() { if (startWd) { clearTimeout(startWd); startWd = null; } }
-    function armStartWd(channel) {
-        clearStartWd();
-        var vodLike = !!(channel && /^(movies?|vod|series)$/.test(String(channel.type || '')));
-        var cfg = (typeof APP_CONFIG !== 'undefined' && APP_CONFIG) || {};
-        var ms = vodLike ? (cfg.START_DEADLINE_VOD_MS || 25000) : (cfg.START_DEADLINE_LIVE_MS || 12000);
-        var gen = ++startWdGen;
-        startWd = setTimeout(function () {
-            startWd = null;
-            if (gen !== startWdGen) return;
-            try { if (window.PlayerAVPlay) PlayerAVPlay.stop(); } catch (eA) {}
-            try { if (window.PlayerExo) PlayerExo.stop(); } catch (eE) {}
-            clearExoStuck();
-            destroyHls();
-            restoreExoSurface();
-            try { if (videoEl) videoEl.pause(); } catch (eV) {}
-            lastErrCode = 'E-TIME';
-            fireStateEvent('error', 'timeout');
-            showError(T('err_could_not_play'), T('err_timeout'));
-        }, ms);
     }
     function clearExoStuck() { if (exoStuckTimer) { clearTimeout(exoStuckTimer); exoStuckTimer = null; } }
 
@@ -1212,7 +1182,6 @@ var Player = (function () {
 
     function play(channel) {
         if (!channel) return;
-        armStartWd(channel);
         extHandoff = 0;
         upgradeLegacyXtreamUrl(channel);
         // Stalker channels carry no direct URL — resolve one per-play (tokens
@@ -1325,8 +1294,6 @@ var Player = (function () {
     }
 
     function stop() {
-        clearStartWd();
-        startWdGen++;
         clearExoStuck();
         exoPictureUp = false;
         // Clear any subtitle tracks first so the old VTT

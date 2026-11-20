@@ -3351,11 +3351,9 @@ html:not([data-touch="1"]) [data-view-mode="list"] .vod-info-play {
     text-align: center;
 }
 .live-top-mini-ph-title {
-    font-size: calc(26px * var(--ui-scale));; font-weight: 700; margin-bottom: 6px; color: rgba(255,255,255,0.86);
-    max-width: 100%; box-sizing: border-box; padding: 0 16px; overflow-wrap: break-word; word-wrap: break-word; }
+    font-size: calc(26px * var(--ui-scale));; font-weight: 700; margin-bottom: 6px; color: rgba(255,255,255,0.86); }
 .live-top-mini-ph-sub {
-    font-size: calc(26px * var(--ui-scale));; color: rgba(255,255,255,0.52);
-    max-width: 100%; box-sizing: border-box; padding: 0 16px; overflow-wrap: break-word; word-wrap: break-word; }
+    font-size: calc(26px * var(--ui-scale));; color: rgba(255,255,255,0.52); }
 .live-top-mini-overlay {
     position: absolute;
     left: 0; right: 0; bottom: 0;
