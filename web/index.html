@@ -1,0 +1,1172 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=1920, initial-scale=1.0, user-scalable=no">
+    <title>Xtivio</title>
+    <link rel="stylesheet" type="text/css" href="assets/css/reset.css">
+    <link rel="stylesheet" type="text/css" href="assets/css/fonts.css">
+    <link rel="stylesheet" type="text/css" href="assets/css/main.css">
+    <link rel="stylesheet" type="text/css" href="assets/css/components.css">
+    <link rel="stylesheet" type="text/css" href="assets/css/screens.css">
+    <link rel="stylesheet" type="text/css" href="assets/css/player.css">
+    <link rel="stylesheet" type="text/css" href="assets/css/tv-scale.css">
+    <!-- RTL last: its [dir="rtl"] rules must override the LTR margins/positions
+         set above. Inert unless <html dir="rtl"> is set by I18n.setLanguage. -->
+    <link rel="stylesheet" type="text/css" href="assets/css/rtl.css">
+    <link rel="stylesheet" type="text/css" href="assets/css/tv-720.css">
+    <script type="text/javascript">
+    /* Set data-vp BEFORE the body (and the splash) paints, so the very first
+     * splash frame already has the 720-scaled logo. app.js re-applies the same
+     * logic later; doing it here first avoids the Booting splash flashing the
+     * full-size 1080 logo before app.js runs. <=1366 -> 720 (matches app.js). */
+    (function () {
+        try {
+            var vpw = window.innerWidth || 0;
+            if (vpw > 0 && vpw <= 1366) {
+                document.documentElement.setAttribute('data-vp', '720');
+            }
+        } catch (e) {}
+    })();
+    </script>
+    <script type="text/javascript" src="assets/js/theme.js"></script>
+</head>
+<body>
+    <div id="app">
+        <!-- Splash / Boot screen -->
+        <div id="splash" class="screen active">
+            <div class="splash-inner">
+                <!-- Stacked brand lockup (mark + wordmark). Replaces the previous
+                     letter-avatar lockup: a bare "X" glyph reads as the X (formerly
+                     Twitter) mark, which is a trademark risk on a store submission. -->
+                <div class="splash-logo">
+                    <img class="splash-logo-img" src="assets/img/logo-stacked.png" alt="Xtivio">
+                </div>
+                <div class="splash-bar"><div class="splash-bar-fill"></div></div>
+                <div class="splash-status" id="splashStatus">Booting...</div>
+            </div>
+        </div>
+
+        <!-- Onboarding screen -->
+        <div id="onboarding" class="screen">
+            <div class="onboarding-wrap">
+                <div class="onboard-col left">
+                    <h1 class="onboard-title"><span data-i18n="ui_welcome_to">Welcome to</span><br><span class="accent">Xtivio</span></h1>
+                    <p class="onboard-sub" data-i18n="ui_pair_your_tv_to_load_your">Pair your device to load your sources. Use your phone to scan the code, or enter the pairing code on our website.</p>
+                    <div class="pair-code-box">
+                        <div class="pair-label" data-i18n="ui_pairing_code">PAIRING CODE</div>
+                        <div class="pair-code" id="pairCode">------</div>
+                        <div class="pair-url" id="pairUrl">loading...</div>
+                        <!-- Code TTL countdown — refreshed each second from
+                             state.pairExpiresAt (whatever expiry the server sends). -->
+                        <div class="pair-expires note-center" id="pairExpires">Code expires in --:--</div>
+                    </div>
+                    <div class="onboard-actions">
+                        <button class="btn focusable" data-focus-key="pair-manual" data-i18n="ui_enter_playlist">Add Source</button>
+                        <button class="btn focusable" data-focus-key="pair-refresh" data-focus-right="pair-lang" data-i18n="ui_refresh_code">Refresh Code</button>
+                        <button class="btn focusable" data-focus-key="pair-login" data-focus-right="pair-lang" id="pairLogin" data-i18n="ui_sign_in_sync">Sign In &amp; Sync</button>
+                        <button class="btn focusable" data-focus-key="pair-skip" data-focus-right="pair-lang" id="pairExit" data-i18n="ui_exit_app">Exit App</button>
+                    </div>
+                </div>
+                <div class="onboard-col right">
+                    <button class="btn focusable pair-lang" data-focus-key="pair-lang" data-focus-left="pair-refresh" id="pairLang"><span data-i18n="ui_language">Language</span><span id="pairLangVal"></span></button>
+                    <div class="qr-frame">
+                        <div id="qrCanvas"></div>
+                    </div>
+                    <div class="qr-caption" data-i18n="ui_scan_to_pair">Scan to pair</div>
+                    <p class="onboard-disclaimer" data-i18n="ui_this_app_is_purely_a_player">This app is purely a player and does not provide any content, channels or subscriptions. It requires users to input their own IPTV sources.</p>
+                    <p class="onboard-lite-note init-hidden" id="onboardLiteNote" data-i18n="ui_lite_mode_has_been_enabled_for">Lite mode has been enabled for this device to keep things running smoothly. You can change this in Settings &rsaquo; Performance Mode.</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Content type picker. Shown after first source add (manual path)
+             or any time the user lands without a saved content-type
+             preference. The pairing path normally sets this server-side, so
+             paired users skip this screen. -->
+        <!-- Manual URL entry -->
+        <div id="manualEntry" class="screen">
+            <div class="modal-wrap">
+                <h2 data-i18n="ui_add_playlist">Add Source</h2>
+                <div class="tab-row">
+                    <button class="btn focusable active mr-10" data-tab="m3u" data-focus-key="tab-m3u" data-i18n="ui_m3u_url">M3U URL</button>
+                    <button class="btn focusable mr-10" data-tab="xtream" data-focus-key="tab-xtream" data-i18n="ui_xtream_codes">Xtream Codes</button>
+                    <button class="btn focusable" data-tab="stalker" data-focus-key="tab-stalker" data-i18n="ui_stalker_portal">Stalker Portal</button>
+                </div>
+
+                <div class="tab-panel active" data-panel="m3u">
+                    <label class="field-label" data-i18n="ui_playlist_name">Source Name</label>
+                    <input type="text" class="field focusable" id="m3uName" data-focus-key="m3u-name" placeholder="My Source" data-i18n-placeholder="ui_ph_my_playlist">
+                    <label class="field-label" data-i18n="ui_m3u_url">M3U URL</label>
+                    <input type="text" class="field focusable" id="m3uUrl" data-focus-key="m3u-url" placeholder="http://example.com/playlist.m3u">
+                    <label class="auth-toggle-row ct-check focusable" tabindex="-1" data-focus-key="m3u-auth"><input type="checkbox" id="m3uAuth"> <span data-i18n="ui_url_requires_login">This URL requires a login</span></label>
+                    <div class="auth-fields init-hidden" id="m3uAuthFields">
+                        <label class="field-label" data-i18n="ui_username">Username</label>
+                        <input type="text" class="field focusable" id="m3uAuthUser" data-focus-key="m3u-auth-user" placeholder="username" data-i18n-placeholder="ui_ph_username">
+                        <label class="field-label" data-i18n="ui_password">Password</label>
+                        <input type="text" class="field focusable" id="m3uAuthPass" data-focus-key="m3u-auth-pass" placeholder="password" data-i18n-placeholder="ui_ph_password">
+                    </div>
+                    <label class="field-label" data-i18n="ui_epg_url_optional">EPG URL (optional)</label>
+                    <input type="text" class="field focusable" id="m3uEpg" data-focus-key="m3u-epg" placeholder="http://example.com/epg.xml">
+                    <label class="auth-toggle-row ct-check focusable" tabindex="-1" data-focus-key="m3u-epg-auth"><input type="checkbox" id="m3uEpgAuth"> <span data-i18n="ui_epg_url_requires_login">EPG URL requires a login</span></label>
+                    <div class="auth-fields init-hidden" id="m3uEpgAuthFields">
+                        <label class="field-label" data-i18n="ui_username">Username</label>
+                        <input type="text" class="field focusable" id="m3uEpgAuthUser" data-focus-key="m3u-epg-auth-user" placeholder="username" data-i18n-placeholder="ui_ph_username">
+                        <label class="field-label" data-i18n="ui_password">Password</label>
+                        <input type="text" class="field focusable" id="m3uEpgAuthPass" data-focus-key="m3u-epg-auth-pass" placeholder="password" data-i18n-placeholder="ui_ph_password">
+                    </div>
+                </div>
+
+                <div class="tab-panel" data-panel="xtream">
+                    <label class="field-label" data-i18n="ui_playlist_name">Source Name</label>
+                    <input type="text" class="field focusable" id="xtName" data-focus-key="xt-name" placeholder="My Xtream" data-i18n-placeholder="ui_ph_my_xtream">
+                    <label class="field-label" data-i18n="ui_server_url">Server URL</label>
+                    <input type="text" class="field focusable" id="xtHost" data-focus-key="xt-host" placeholder="http://server.com:8080">
+                    <label class="field-label" data-i18n="ui_username">Username</label>
+                    <input type="text" class="field focusable" id="xtUser" data-focus-key="xt-user" placeholder="username" data-i18n-placeholder="ui_ph_username">
+                    <label class="field-label" data-i18n="ui_password">Password</label>
+                    <input type="text" class="field focusable" id="xtPass" data-focus-key="xt-pass" data-focus-down="manual-ct-live" placeholder="password" data-i18n-placeholder="ui_ph_password">
+                    <div class="manual-ct-row">
+                        <div class="manual-ct-label" data-i18n="ui_show_on_this_playlist">Show on this source:</div>
+                        <label class="ct-check focusable" tabindex="-1" data-focus-key="manual-ct-live" data-focus-down="manual-epg" data-i18n="ui_live_tv"><input type="checkbox" id="manualCtLive" checked> Live TV</label>
+                        <label class="ct-check focusable" tabindex="-1" data-focus-key="manual-ct-movies" data-focus-down="manual-epg" data-i18n="ui_movies"><input type="checkbox" id="manualCtMovies" checked> Movies</label>
+                        <label class="ct-check focusable" tabindex="-1" data-focus-key="manual-ct-series" data-focus-down="manual-epg" data-i18n="ui_series"><input type="checkbox" id="manualCtSeries" checked> Series</label>
+                    </div>
+                    <div class="manual-ct-row">
+                        <div class="manual-ct-label" data-i18n="ui_guide">Guide:</div>
+                        <label class="ct-check focusable" tabindex="-1" data-focus-key="manual-epg" data-focus-up="manual-ct-live" data-focus-down="manual-save" data-i18n="ui_epg"><input type="checkbox" id="manualEpg" checked> EPG</label>
+                    </div>
+                </div>
+
+                <div class="tab-panel" data-panel="stalker">
+                    <label class="field-label" data-i18n="ui_playlist_name">Source Name</label>
+                    <input type="text" class="field focusable" id="stName" data-vk-label="1" data-focus-key="st-name" placeholder="My Portal" data-i18n-placeholder="ui_ph_my_portal">
+                    <label class="field-label" data-i18n="ui_portal_url">Portal URL</label>
+                    <input type="text" class="field focusable" id="stUrl" data-vk-label="1" data-focus-key="st-url" placeholder="http://portal.com/c/">
+                    <label class="field-label" data-i18n="ui_mac_address">MAC Address</label>
+                    <input type="text" class="field focusable" id="stMac" data-vk-label="1" data-focus-key="st-mac" data-focus-down="st-serial" placeholder="00:1A:79:XX:XX:XX">
+                    <label class="field-label" data-i18n="ui_serial_number_optional">Serial Number (optional)</label>
+                    <input type="text" class="field focusable" id="stSerial" data-vk-label="1" data-focus-key="st-serial" data-focus-down="st-devid" placeholder="Only if your portal requires it" data-i18n-placeholder="ui_ph_only_if_your_portal_requires_it">
+                    <label class="field-label" data-i18n="ui_device_id_optional">Device ID (optional)</label>
+                    <input type="text" class="field focusable" id="stDevId" data-vk-label="1" data-focus-key="st-devid" data-focus-down="st-model" placeholder="Only if your portal requires it" data-i18n-placeholder="ui_ph_only_if_your_portal_requires_it">
+                    <label class="field-label" data-i18n="ui_stb_model_optional">STB model (optional)</label>
+                    <select class="field focusable" id="stModel" data-focus-key="st-model" data-focus-down="st-model-custom"><option value="" data-i18n="ui_stb_model_default">Default</option></select>
+                    <label class="field-label" data-i18n="ui_stb_model_custom">Custom model (optional)</label>
+                    <input type="text" class="field focusable" id="stModelCustom" data-vk-label="1" data-focus-key="st-model-custom" data-focus-down="stalker-ct-live" maxlength="32" placeholder="MAG254" data-i18n-placeholder="ui_ph_stb_model_custom">
+                    <div class="manual-hint" data-i18n="ui_stalker_mag_portals_authenticate_by_mac">Stalker/MAG portals authenticate by MAC address. Most need only the MAC; some also require the box's Serial Number and Device ID — leave those blank unless your provider gave them to you.</div>
+                    <div class="manual-hint" data-i18n="ui_stb_model_hint">Some portals only accept one box model. Leave the model on Default unless your provider told you which one to use; a custom model overrides the list.</div>
+                    <div class="manual-ct-row">
+                        <div class="manual-ct-label" data-i18n="ui_show_on_this_playlist">Show on this source:</div>
+                        <label class="ct-check focusable" tabindex="-1" data-focus-key="stalker-ct-live" data-focus-down="stalker-epg" data-i18n="ui_live_tv"><input type="checkbox" id="stalkerCtLive" checked> Live TV</label>
+                        <label class="ct-check focusable" tabindex="-1" data-focus-key="stalker-ct-movies" data-focus-down="stalker-epg" data-i18n="ui_movies"><input type="checkbox" id="stalkerCtMovies" checked> Movies</label>
+                        <label class="ct-check focusable" tabindex="-1" data-focus-key="stalker-ct-series" data-focus-down="stalker-epg" data-i18n="ui_series"><input type="checkbox" id="stalkerCtSeries" checked> Series</label>
+                    </div>
+                    <div class="manual-ct-row">
+                        <div class="manual-ct-label" data-i18n="ui_guide">Guide:</div>
+                        <label class="ct-check focusable" tabindex="-1" data-focus-key="stalker-epg" data-focus-up="stalker-ct-live" data-focus-down="manual-save" data-i18n="ui_epg"><input type="checkbox" id="stalkerEpg" checked> EPG</label>
+                    </div>
+                </div>
+
+                <div class="modal-actions">
+                    <button class="btn focusable" id="manualSave" data-focus-key="manual-save" data-focus-up="manual-epg" data-i18n="ui_save_playlist">Save Source</button>
+                    <button class="btn focusable" id="manualCancel" data-focus-key="manual-cancel" data-i18n="ui_cancel">Cancel</button>
+                </div>
+                <!-- Scroll spacer: on the real devices (webOS 6.5 AND webOS 10) the
+                     modal-wrap's bottom padding and the actions' bottom margin didn't
+                     create scrollable clearance, so the Save/Cancel row couldn't be
+                     scrolled fully into view (probe: row 8px past the wrap bottom,
+                     "space below = -4px"). A real element's height IS counted in
+                     scrollHeight on every engine, so this guarantees clearance. -->
+                <div class="modal-scroll-spacer" aria-hidden="true"></div>
+
+            </div>
+        </div>
+
+        <!-- Home screen -->
+        <div id="home" class="screen">
+            <aside class="sidebar" id="sidebar">
+                <!-- Two lockups, one shown at a time by CSS.
+                     Collapsed (80px rail): the mark alone — there is no room for a
+                     wordmark, and it sits naturally above the icon column.
+                     Expanded (240px): the horizontal lockup (mark + "Xtivio"). A small
+                     square mark alone looks orphaned in a wide panel; the wordmark
+                     fills the width and gives the panel a proper header, which is
+                     exactly what the expanded state does for the nav items too. -->
+                <div class="side-logo">
+                    <img class="side-logo-img" src="assets/img/logo-mark.png" alt="Xtivio">
+                    <img class="side-logo-full" src="assets/img/logo-horizontal.png" alt="Xtivio">
+                </div>
+                <nav class="side-nav">
+                    <!--
+                        Sidebar icons are now inlined as <svg> elements
+                        rather than loaded via <img src="…">. The previous approach
+                        couldn't unify icon sizes reliably because each external SVG
+                        had different internal padding, and currentColor doesn't apply
+                        across <img> boundaries. Inlining gives:
+                          - true CSS color control (focused/active/exit colour via
+                            currentColor on the SVG's stroke)
+                          - consistent rendered box (every icon shares viewBox 0 0 24 24
+                            with paths in roughly the [3,3]-[21,21] bounds)
+                          - zero per-icon overrides — they all just sit inside .nav-ic
+                            and inherit width/height/colour from the wrapper.
+                        The matching files in assets/img/ic-*.svg are kept in sync for
+                        reference and for the few places that still <img src=…> them.
+                    -->
+                    <button class="nav-btn focusable active" data-section="home" data-focus-key="nav-home" title="Home">
+                        <span class="nav-ic"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><g transform="translate(0.96 2.616) scale(1.104) translate(-2.0 -3.0)"><path d="M12 3L2 12h3v8h6v-6h2v6h6v-8h3L12 3z"/></g></svg></span><span class="nav-lbl" data-i18n="ui_home">Home</span>
+                    </button>
+                    <button class="nav-btn focusable" data-section="search" data-focus-key="nav-search" title="Search">
+                        <span class="nav-ic"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><g transform="translate(0.96 0.96) scale(1.2624) translate(-3.0 -3.0)"><path d="M15.5 14h-.79l-.28-.27A6.47 6.47 0 0016 9.5 6.5 6.5 0 109.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></g></svg></span><span class="nav-lbl" data-i18n="ui_search">Search</span>
+                    </button>
+                    <button class="nav-btn focusable" data-section="favorites" data-focus-key="nav-fav" title="Favorites">
+                        <span class="nav-ic"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><g transform="translate(0.96 1.501) scale(1.104) translate(-2.0 -2.0)"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></g></svg></span><span class="nav-lbl" data-i18n="ui_favorites">Favorites</span>
+                    </button>
+                    <button class="nav-btn focusable" data-section="livetv" data-focus-key="nav-livetv" title="Live TV">
+                        <span class="nav-ic"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><g transform="translate(2.187 0.96) scale(1.2267) translate(-4.0 -3.0)"><path d="M8.5 3l3.5 4 3.5-4 1.5 1.3L14 8h4c1.1 0 2 .9 2 2v9c0 1.1-.9 2-2 2H6c-1.1 0-2-.9-2-2v-9c0-1.1.9-2 2-2h4L7 4.3 8.5 3zM6 10v9h12v-9H6z"/></g></svg></span><span class="nav-lbl" data-i18n="ui_live_tv">Live TV</span>
+                    </button>
+                    <button class="nav-btn focusable" data-section="catchup" data-focus-key="nav-catchup" title="Catch-up" id="navCatchup" style="display:none">
+                        <span class="nav-ic"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path d="M13 3a9 9 0 00-9 9H1l3.89 3.89.07.14L9 12H6a7 7 0 117 7c-1.93 0-3.68-.79-4.94-2.06l-1.42 1.42A8.954 8.954 0 0013 21a9 9 0 000-18zm-1 5v5l4.28 2.54.72-1.21-3.5-2.08V8H12z"/></svg></span><span class="nav-lbl" data-i18n="cu_title">Catch-up</span>
+                    </button>
+                    <button class="nav-btn focusable" data-section="movies" data-focus-key="nav-movies" title="Movies">
+                        <span class="nav-ic"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><g transform="translate(0.96 3.168) scale(1.104) translate(-2.0 -4.0)"><path d="M18 4l2 4h-3l-2-4h-2l2 4h-3l-2-4H8l2 4H7L5 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V4h-4zm-6.5 11.5L10 14l-3 4h10l-2.5-3.5-2 2.5z"/></g></svg></span><span class="nav-lbl" data-i18n="ui_movies">Movies</span>
+                    </button>
+                    <button class="nav-btn focusable" data-section="series" data-focus-key="nav-series" title="Series">
+                        <span class="nav-ic"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><g transform="translate(0.96 2.967) scale(1.0036) translate(-1.0 -3.0)"><path d="M21 3H3c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h5v2h8v-2h5c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 14H3V5h18v12zM10 8.5v7l5-3.5-5-3.5z"/></g></svg></span><span class="nav-lbl" data-i18n="ui_series">Series</span>
+                    </button>
+                    <button class="nav-btn focusable" data-section="sports" data-focus-key="nav-sports" title="Sports">
+                        <span class="nav-ic"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><g transform="translate(0.96 0.96) scale(1.2624) translate(-3.0 -3.0)"><path d="M12 3a9 9 0 100 18 9 9 0 000-18zm0 2c.9 0 1.7.2 2.5.5l-.6 1.6-1.9 1.2-1.9-1.2-.6-1.6c.8-.3 1.6-.5 2.5-.5zM5.9 8l1.7.3.6 1.9-1.3 2.3-1.8-.2A7 7 0 015.9 8zm12.2 0a7 7 0 011.1 4.3l-1.8.2-1.3-2.3.6-1.9L18.1 8zM10 12.3l.9-.7h2.2l.9.7.4 1.8-1.4 1.1h-2l-1.4-1.1.4-1.8zm-3.4 3.4l1.8.1 1 1.7-.6 1.7a7 7 0 01-2.2-3.5zm10.8 0a7 7 0 01-2.2 3.5l-.6-1.7 1-1.7 1.8-.1z"/></g></svg></span><span class="nav-lbl" data-i18n="ui_sports">Sports</span>
+                    </button>
+                    <button class="nav-btn focusable" data-section="playlists" data-focus-key="nav-pl" title="Playlists">
+                        <span class="nav-ic"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><g transform="translate(0.96 1.696) scale(1.472) translate(-4.0 -6.0)"><path d="M4 10h12v2H4v-2zm0-4h12v2H4V6zm0 8h8v2H4v-2zm10 0v6l5-3-5-3z"/></g></svg></span><span class="nav-lbl" data-i18n="ui_playlists">Sources</span>
+                    </button>
+                    <button class="nav-btn focusable" data-section="parental" data-focus-key="nav-parental" title="Parental Controls">
+                        <!-- Parental icon now contains two <path>s sharing the same shield outline. Outline is shown by default; .parental-on class on the wrapper swaps to the filled variant via CSS. JS toggles the class instead of swapping img src. -->
+                        <span class="nav-ic parental-nav-ic" id="parentalNavIcon"><svg class="parental-icon-outline" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><g transform="translate(2.942 0.96) scale(1.1323) translate(-4.0 -2.5)"><path d="M12 2.5 20 6v5.2c0 5.1-3.2 9.2-8 10.8-4.8-1.6-8-5.7-8-10.8V6l8-3.5z"/></g></svg><svg class="parental-icon-filled" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><g transform="translate(2.942 0.96) scale(1.1323) translate(-4.0 -2.5)"><path d="M12 2.5 20 6v5.2c0 5.1-3.2 9.2-8 10.8-4.8-1.6-8-5.7-8-10.8V6l8-3.5z"/></g></svg></span><span class="nav-lbl" data-i18n="ui_parental">Parental</span>
+                    </button>
+                    <button class="nav-btn focusable" data-section="settings" data-focus-key="nav-settings" title="Settings">
+                        <span class="nav-ic"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><g transform="translate(1.256 0.96) scale(1.15) translate(-2.679 -2.4)"><path d="M19.14 12.94c.04-.31.06-.63.06-.94 0-.31-.02-.63-.06-.94l2.03-1.58a.49.49 0 00.12-.61l-1.92-3.32a.49.49 0 00-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54a.48.48 0 00-.48-.41h-3.84a.48.48 0 00-.48.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96a.49.49 0 00-.59.22L2.74 8.87a.48.48 0 00.12.61l2.03 1.58c-.04.31-.06.63-.06.94 0 .31.02.63.06.94l-2.03 1.58a.49.49 0 00-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.26.41.48.41h3.84c.24 0 .44-.17.48-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6A3.6 3.6 0 1115.6 12 3.6 3.6 0 0112 15.6z"/></g></svg></span><span class="nav-lbl" data-i18n="ui_settings">Settings</span>
+                    </button>
+                    <button class="nav-btn nav-exit focusable" data-focus-key="nav-exit" title="Exit" id="navExit">
+                        <span class="nav-ic"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><g transform="translate(0.96 0.96) scale(1.2267) translate(-3.0 -3.0)"><path d="M10.09 15.59L11.5 17l5-5-5-5-1.41 1.41L12.67 11H3v2h9.67l-2.58 2.59zM19 3H5c-1.11 0-2 .9-2 2v4h2V5h14v14H5v-4H3v4c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2z"/></g></svg></span><span class="nav-lbl" data-i18n="ui_exit">Exit</span>
+                    </button>
+                </nav>
+                <div class="side-foot">
+                    <div class="side-clock" id="sideClock">--:--</div>
+                </div>
+            </aside>
+
+            <main class="main-area" id="mainArea">
+                <!-- Home section - lightweight dashboard (hero, Continue Watching,
+                     favourites row, quick category grid). Historically this was the
+                     Live TV screen; the Live TV guide is now its own section below. -->
+                <section class="content-section active" data-section-content="home">
+                    <header class="section-head">
+                        <h2 class="section-title"></h2>
+                        <div class="section-meta">
+                            <span class="chip" id="activePlaylistChip" data-i18n="ui_no_playlist">No source</span>
+                            <span class="chip accent" id="channelCountChip">0 items</span>
+                        </div>
+                    </header>
+
+                    <div class="hero-card" id="heroCard">
+                        <div class="hero-bg"></div>
+                        <div class="hero-inner">
+                            <div class="hero-eyebrow" data-i18n="ui_now_watching">NOW WATCHING</div>
+                            <div class="hero-title" id="heroTitle" data-i18n="ui_select_a_channel_to_begin">Select a channel to begin</div>
+                            <div class="hero-sub" id="heroSub" data-i18n="ui_browse_categories_search_or_open_the">Browse categories, search, or open the guide to find channels.</div>
+                            <div class="hero-actions">
+                                <button class="btn focusable" id="heroPlay" data-focus-key="hero-play" data-i18n="ui_resume">&#9654; Resume</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="row-block" id="recentBlock">
+                        <div class="row-head"><h3 data-i18n="ui_continue_watching">Continue Watching</h3><span class="row-hint" data-i18n="ui_press_blue_to_remove">Press BLUE to remove</span></div>
+                        <div class="channel-grid" id="channelRowRecent" data-row="recent"></div>
+                    </div>
+                </section>
+
+                <!-- Favorites section -->
+                <section class="content-section" data-section-content="favorites">
+                    <header class="section-head"><h2 class="section-title" data-i18n="ui_favorites">Favorites</h2></header>
+                    <div class="fav-tabs">
+                        <button class="btn focusable active mr-8" data-fav-type="live" data-focus-key="fav-tab-live" tabindex="-1" data-i18n="ui_live_tv">Live TV</button>
+                        <button class="btn focusable mr-8" data-fav-type="vod" data-focus-key="fav-tab-movies" tabindex="-1" data-i18n="ui_movies">Movies</button>
+                        <button class="btn focusable" data-fav-type="series" data-focus-key="fav-tab-series" tabindex="-1" data-i18n="ui_series">Series</button>
+                    </div>
+                    <div class="channel-grid" id="favGrid"></div>
+                </section>
+
+                <!-- Guide (Combined Live TV + EPG) -->
+                <section class="content-section" data-section-content="livetv">
+                    <!-- Fixed top zone: mini player + EPG controls + headers -->
+                    <div class="livetv-fixed-top">
+                        <div id="liveTopMiniPlayer" class="live-top-mini">
+                            <div class="live-top-mini-row">
+                                <div class="live-top-mini-frame" id="liveTopMiniFrame">
+                                    <!-- Main #videoEl gets moved here by JS -->
+                                    <div class="spinner hidden" id="liveTopMiniSpinner"></div>
+                                    <div class="live-top-mini-loading-text hidden" id="liveTopMiniLoadingText" data-i18n="ui_loading_stream">Loading stream...</div>
+                                    <div id="liveTopMiniPlaceholder" class="live-top-mini-placeholder">
+                                        <div class="live-top-mini-ph-title" data-i18n="ui_live_tv_preview">Live TV Preview</div>
+                                        <div class="live-top-mini-ph-sub" data-i18n="ui_press_ok_on_a_channel_to">Press OK on a channel to preview</div>
+                                    </div>
+                                    <div class="live-top-mini-overlay">
+                                        <div class="live-top-mini-main">
+                                            <div id="liveTopMiniName" class="live-top-mini-name" data-i18n="ui_no_channel_selected">No channel selected</div>
+                                            <div id="liveTopMiniNow" class="live-top-mini-now" data-i18n="ui_press_ok_on_a_channel_to">Press OK on a channel to preview</div>
+                                        </div>
+                                        <div class="live-top-mini-actions">
+                                            <button class="btn focusable" id="liveTopMiniExpand" data-focus-key="live-top-mini-expand" tabindex="-1" title="Full Screen"><svg viewBox="0 0 32 32" width="30" height="30" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><line x1="16" y1="16" x2="6" y2="6"/><polyline points="6 13 6 6 13 6"/><line x1="16" y1="16" x2="26" y2="6"/><polyline points="19 6 26 6 26 13"/><line x1="16" y1="16" x2="6" y2="26"/><polyline points="6 19 6 26 13 26"/><line x1="16" y1="16" x2="26" y2="26"/><polyline points="19 26 26 26 26 19"/></svg></button>
+                                            <button class="btn focusable" id="liveTopMiniClose" data-focus-key="live-top-mini-close" tabindex="-1" title="Stop"><svg viewBox="0 0 24 24" width="30" height="30" fill="currentColor"><rect x="5" y="5" width="14" height="14" rx="1"/></svg></button>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="live-top-mini-side">
+                                    <div class="live-epg-controls-side" id="liveEpgControlsSide">
+                                        <div class="live-epg-controls-row">
+                                            <button class="btn focusable" id="epgTimePrevSide" data-focus-key="epg-time-prev" tabindex="-1" data-i18n="ui_earlier">&larr; Earlier</button>
+                                            <button class="btn focusable" id="epgTimeNowSide" data-focus-key="epg-time-now" tabindex="-1" data-i18n="ui_current_time">Current Time</button>
+                                            <button class="btn focusable" id="epgTimeNextSide" data-focus-key="epg-time-next" data-focus-right="__none__" tabindex="-1" data-i18n="ui_later">Later &rarr;</button>
+                                        </div>
+                                        <div class="live-epg-page-info-row">
+                                            <span class="live-epg-page-info" id="liveEpgPageInfoSide"></span>
+                                        </div>
+                                        <div class="live-epg-hint-row" id="liveEpgHintSide" data-i18n="ui_epg_hold_hint">Hold Left or Right to move the guide time</div>
+                                        <!-- Now/Next rail. Shown in BOTH views: tracks the focused guide
+                                             row in List view and the focused channel card in Card view.
+                                             Owned by id via updateLiveNowBar() / the mini player. -->
+                                        <div class="live-now-side live-now-side-hidden" id="liveNowSide">
+                                            <div class="live-now-side-head">
+                                                <span class="live-now-side-label" id="liveNowLabelSide" data-i18n="ui_now">NOW</span>
+                                                <span class="live-now-side-time" id="liveNowTimeSide"></span>
+                                            </div>
+                                            <div class="live-now-side-line">
+                                                <span class="live-now-side-title" id="liveNowTitleSide"></span>
+                                            </div>
+                                            <div class="live-next-side-head">
+                                                <span class="live-next-side-label" id="liveNextLabelSide" data-i18n="ui_next">NEXT</span>
+                                                <span class="live-next-side-time" id="liveNextTimeSide"></span>
+                                            </div>
+                                            <div class="live-next-side-line">
+                                                <span class="live-next-side-title" id="liveNextTitleSide"></span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- Scrollable guide area -->
+                    <div class="livetv-scroll">
+                    <div class="panel-wrap">
+                        <!-- Left: Category list -->
+                        <div class="panel-col panel-cats" id="liveCats">
+                            <div class="panel-cat-head"><span data-i18n="ui_categories">Categories</span><button class="cat-manage-btn focusable" id="liveTvManageCats" data-focus-key="livetv-manage-cats" tabindex="-1" data-i18n="ui_manage">Manage</button><button class="cat-collapse-btn focusable" id="liveCatsToggle" data-focus-key="livetv-cats-toggle" tabindex="-1" aria-label="Collapse categories"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="15 6 9 12 15 18"></polyline></svg></button></div>
+                            <div class="panel-cat-search"><input type="text" class="field focusable cat-filter" id="liveCatFilter" data-focus-key="live-cat-filter" placeholder="Filter categories..." data-i18n-placeholder="ui_ph_filter_categories" readonly></div>
+                            <div class="panel-cat-list pt-8" id="liveCatList"></div>
+                        </div>
+                        <!-- Right: Channels + EPG timeline -->
+                        <div class="panel-col panel-channels" id="liveChannels">
+                            <!-- Card-view action bar (parallels movies/series). Category
+                                 dropdown + search + the two managers. Hidden in list view. -->
+                            <div class="card-action-bar" id="liveCardBar">
+                                <button class="card-act card-act-cat focusable" id="liveCardCat" data-focus-key="live-card-cat" tabindex="-1" aria-label="Categories">
+                                    <span class="card-act-cat-name" id="liveCardCatName" data-i18n="ui_all">All</span>
+                                    <svg class="card-act-caret" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M6 9l6 6 6-6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                                    <span class="card-act-label" data-i18n="ui_categories">Categories</span>
+                                </button>
+                                <button class="card-act card-act-ico-btn focusable" id="liveCardSearch" data-focus-key="live-card-search" tabindex="-1" aria-label="Search">
+                                    <svg class="card-act-ico" viewBox="0 0 24 24" width="24" height="24" aria-hidden="true"><circle cx="11" cy="11" r="7" fill="none" stroke="currentColor" stroke-width="2"/><path d="M16 16l5 5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+                                    <span class="card-act-label" data-i18n="ui_cardbar_content_search">Content Search</span>
+                                </button>
+                                <button class="card-act card-act-ico-btn focusable" id="liveCardManageCats" data-focus-key="live-card-manage-cats" tabindex="-1" aria-label="Manage Categories">
+                                    <svg class="card-act-ico" viewBox="0 0 24 24" width="24" height="24" aria-hidden="true"><path d="M8 5h12M8 10h12M8 15h8" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="3.5" cy="5" r="1.4" fill="currentColor"/><circle cx="3.5" cy="10" r="1.4" fill="currentColor"/><circle cx="3.5" cy="15" r="1.4" fill="currentColor"/><g transform="translate(17.5 18) scale(0.82)"><circle r="6.2" fill="var(--bg-2)"/><path fill="currentColor" d="M 0 -5.2 L 1.45 -3.51 L 3.68 -3.68 L 3.51 -1.45 L 5.2 0 L 3.51 1.45 L 3.68 3.68 L 1.45 3.51 L 0 5.2 L -1.45 3.51 L -3.68 3.68 L -3.51 1.45 L -5.2 0 L -3.51 -1.45 L -3.68 -3.68 L -1.45 -3.51 Z"/><circle r="1.7" fill="var(--bg-2)"/></g></svg>
+                                    <span class="card-act-label" data-i18n="ui_cardbar_category_manager">Category Manager</span>
+                                </button>
+                                <button class="card-act card-act-ico-btn focusable" id="liveCardManageContent" data-focus-key="live-card-manage-content" tabindex="-1" aria-label="Manage Locks">
+                                    <svg class="card-act-ico" viewBox="0 0 24 24" width="24" height="24" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1.5" fill="none" stroke="currentColor" stroke-width="2"/><rect x="14" y="3" width="7" height="7" rx="1.5" fill="none" stroke="currentColor" stroke-width="2"/><rect x="3" y="14" width="7" height="7" rx="1.5" fill="none" stroke="currentColor" stroke-width="2"/><g transform="translate(17.5 17.5) scale(0.82)"><circle r="6.2" fill="var(--bg-2)"/><path fill="currentColor" d="M 0 -5.2 L 1.45 -3.51 L 3.68 -3.68 L 3.51 -1.45 L 5.2 0 L 3.51 1.45 L 3.68 3.68 L 1.45 3.51 L 0 5.2 L -1.45 3.51 L -3.68 3.68 L -3.51 1.45 L -5.2 0 L -3.51 -1.45 L -3.68 -3.68 L -1.45 -3.51 Z"/><circle r="1.7" fill="var(--bg-2)"/></g></svg>
+                                    <span class="card-act-label" data-i18n="ui_cardbar_content_manager">Content Manager</span>
+                                </button>
+                            </div>
+                            <!-- Now playing bar -->
+                            <!-- Time bar -->
+                            <div class="live-epg-headrow">
+                                <div class="live-channels-label"><span data-i18n="ui_channels">CHANNELS</span><button class="cat-manage-btn focusable content-lock-btn" id="liveTvManageContent" data-focus-key="livetv-manage-content" tabindex="-1" data-i18n="ui_manage_locks">Manage Locks</button></div>
+                                <div class="live-epg-timebar" id="liveEpgTimeBar"></div>
+                            </div>
+                            <!-- Search -->
+                            <div class="panel-search">
+                                <input type="text" class="field focusable" id="liveSearchField" data-focus-key="panel-search" placeholder="Search channels..." data-i18n-placeholder="ui_ph_search_channels" readonly>
+                            </div>
+                            <!-- Channel + EPG rows -->
+                            <div class="panel-ch-list" id="liveChList"></div>
+                            <!-- EPG controls moved to mini player side -->
+                        </div>
+                    </div>
+                    </div><!-- end livetv-scroll -->
+                </section>
+
+                <!-- Search -->
+                <section class="content-section" data-section-content="search">
+                    <header class="section-head"><h2 class="section-title" data-i18n="ui_search">Search</h2></header>
+                    <div class="search-wrap">
+                        <input type="text" class="field focusable" id="searchField" data-focus-key="search-field" placeholder="Search all..." data-i18n-placeholder="ui_ph_search_all" readonly>
+                        <div class="search-results" id="searchResults"></div>
+                    </div>
+                </section>
+
+                <!-- EPG is now integrated into Live TV above -->
+
+                <!-- Movies (VOD) -->
+                <section class="content-section" data-section-content="movies">
+                    <div class="panel-wrap">
+                        <div class="panel-col panel-cats" id="movieCats">
+                            <div class="panel-cat-head"><span data-i18n="ui_categories">Categories</span><button class="cat-manage-btn focusable" id="movieManageCats" data-focus-key="movie-manage-cats" tabindex="-1" data-i18n="ui_manage">Manage</button></div>
+                            <div class="panel-cat-search"><input type="text" class="field focusable cat-filter" id="movieCatFilter" data-focus-key="movie-cat-filter" placeholder="Filter categories..." data-i18n-placeholder="ui_ph_filter_categories" readonly></div>
+                            <div class="panel-cat-list" id="movieCatList"></div>
+                        </div>
+                        <div class="panel-col panel-channels" id="movieChannels">
+                            <div class="card-action-bar" id="movieCardBar">
+                                <button class="card-act card-act-cat focusable" id="movieCardCat" data-focus-key="movie-card-cat" tabindex="-1" aria-label="Categories">
+                                    <span class="card-act-cat-name" id="movieCardCatName" data-i18n="ui_all">All</span>
+                                    <svg class="card-act-caret" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M6 9l6 6 6-6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                                    <span class="card-act-label" data-i18n="ui_categories">Categories</span>
+                                </button>
+                                <button class="card-act card-act-ico-btn focusable" id="movieCardSearch" data-focus-key="movie-card-search" tabindex="-1" aria-label="Search">
+                                    <svg class="card-act-ico" viewBox="0 0 24 24" width="24" height="24" aria-hidden="true"><circle cx="11" cy="11" r="7" fill="none" stroke="currentColor" stroke-width="2"/><path d="M16 16l5 5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+                                    <span class="card-act-label" data-i18n="ui_cardbar_content_search">Content Search</span>
+                                </button>
+                                <button class="card-act card-act-ico-btn focusable" id="movieCardManageCats" data-focus-key="movie-card-manage-cats" tabindex="-1" aria-label="Manage Categories">
+                                    <svg class="card-act-ico" viewBox="0 0 24 24" width="24" height="24" aria-hidden="true"><path d="M8 5h12M8 10h12M8 15h8" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="3.5" cy="5" r="1.4" fill="currentColor"/><circle cx="3.5" cy="10" r="1.4" fill="currentColor"/><circle cx="3.5" cy="15" r="1.4" fill="currentColor"/><g transform="translate(17.5 18) scale(0.82)"><circle r="6.2" fill="var(--bg-2)"/><path fill="currentColor" d="M 0 -5.2 L 1.45 -3.51 L 3.68 -3.68 L 3.51 -1.45 L 5.2 0 L 3.51 1.45 L 3.68 3.68 L 1.45 3.51 L 0 5.2 L -1.45 3.51 L -3.68 3.68 L -3.51 1.45 L -5.2 0 L -3.51 -1.45 L -3.68 -3.68 L -1.45 -3.51 Z"/><circle r="1.7" fill="var(--bg-2)"/></g></svg>
+                                    <span class="card-act-label" data-i18n="ui_cardbar_category_manager">Category Manager</span>
+                                </button>
+                                <button class="card-act card-act-ico-btn focusable" id="movieCardManageContent" data-focus-key="movie-card-manage-content" tabindex="-1" aria-label="Manage Locks">
+                                    <svg class="card-act-ico" viewBox="0 0 24 24" width="24" height="24" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1.5" fill="none" stroke="currentColor" stroke-width="2"/><rect x="14" y="3" width="7" height="7" rx="1.5" fill="none" stroke="currentColor" stroke-width="2"/><rect x="3" y="14" width="7" height="7" rx="1.5" fill="none" stroke="currentColor" stroke-width="2"/><g transform="translate(17.5 17.5) scale(0.82)"><circle r="6.2" fill="var(--bg-2)"/><path fill="currentColor" d="M 0 -5.2 L 1.45 -3.51 L 3.68 -3.68 L 3.51 -1.45 L 5.2 0 L 3.51 1.45 L 3.68 3.68 L 1.45 3.51 L 0 5.2 L -1.45 3.51 L -3.68 3.68 L -3.51 1.45 L -5.2 0 L -3.51 -1.45 L -3.68 -3.68 L -1.45 -3.51 Z"/><circle r="1.7" fill="var(--bg-2)"/></g></svg>
+                                    <span class="card-act-label" data-i18n="ui_cardbar_content_manager">Content Manager</span>
+                                </button>
+                            </div>
+                            <div class="panel-ch-head">
+                                <span class="panel-ch-title" id="movieCatTitle" data-i18n="ui_movies_in_current_category">Movies in Current Category</span>
+                                <button class="cat-manage-btn focusable content-lock-btn" id="movieManageContent" data-focus-key="movie-manage-content" tabindex="-1" data-i18n="ui_manage_locks">Manage Locks</button>
+                            </div>
+                            <div class="panel-search">
+                                <input type="text" class="field focusable" id="movieSearchField" data-focus-key="movie-search" placeholder="Search movies..." data-i18n-placeholder="ui_ph_search_movies" readonly>
+                            </div>
+                            <div class="panel-ch-list" id="movieList"></div>
+                        </div>
+                        <div class="panel-col panel-info focusable" id="movieInfo" data-focus-key="movie-info" tabindex="-1">
+                            <div class="vod-poster" id="moviePoster"></div>
+                            <button class="vod-info-play focusable" id="movieInfoPlay" data-focus-key="movie-info-play" tabindex="-1">
+                                <svg class="vod-play-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z" fill="currentColor"/></svg>
+                                <span class="vod-play-lbl" data-i18n="ui_play">Play</span>
+                            </button>
+                            <div class="vod-info-body">
+                                <div class="vod-title" id="movieTitle"></div>
+                                <div class="vod-meta" id="movieMeta"></div>
+                                <div class="vod-rating" id="movieRating"></div>
+                                <div class="vod-genre" id="movieGenre"></div>
+                                <div class="vod-desc" id="movieDesc"></div>
+                                <div class="vod-cast" id="movieCast"></div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Series -->
+                <section class="content-section" data-section-content="series">
+                    <div class="panel-wrap">
+                        <div class="panel-col panel-cats" id="seriesCats">
+                            <div class="panel-cat-head"><span data-i18n="ui_categories">Categories</span><button class="cat-manage-btn focusable" id="seriesManageCats" data-focus-key="series-manage-cats" tabindex="-1" data-i18n="ui_manage">Manage</button></div>
+                            <div class="panel-cat-search"><input type="text" class="field focusable cat-filter" id="seriesCatFilter" data-focus-key="series-cat-filter" placeholder="Filter categories..." data-i18n-placeholder="ui_ph_filter_categories" readonly></div>
+                            <div class="panel-cat-list" id="seriesCatList"></div>
+                        </div>
+                        <div class="panel-col panel-channels" id="seriesChannels">
+                            <div class="card-action-bar" id="seriesCardBar">
+                                <button class="card-act card-act-cat focusable" id="seriesCardCat" data-focus-key="series-card-cat" tabindex="-1" aria-label="Categories">
+                                    <span class="card-act-cat-name" id="seriesCardCatName" data-i18n="ui_all">All</span>
+                                    <svg class="card-act-caret" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M6 9l6 6 6-6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                                    <span class="card-act-label" data-i18n="ui_categories">Categories</span>
+                                </button>
+                                <button class="card-act card-act-ico-btn focusable" id="seriesCardSearch" data-focus-key="series-card-search" tabindex="-1" aria-label="Search">
+                                    <svg class="card-act-ico" viewBox="0 0 24 24" width="24" height="24" aria-hidden="true"><circle cx="11" cy="11" r="7" fill="none" stroke="currentColor" stroke-width="2"/><path d="M16 16l5 5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+                                    <span class="card-act-label" data-i18n="ui_cardbar_content_search">Content Search</span>
+                                </button>
+                                <button class="card-act card-act-ico-btn focusable" id="seriesCardManageCats" data-focus-key="series-card-manage-cats" tabindex="-1" aria-label="Manage Categories">
+                                    <svg class="card-act-ico" viewBox="0 0 24 24" width="24" height="24" aria-hidden="true"><path d="M8 5h12M8 10h12M8 15h8" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="3.5" cy="5" r="1.4" fill="currentColor"/><circle cx="3.5" cy="10" r="1.4" fill="currentColor"/><circle cx="3.5" cy="15" r="1.4" fill="currentColor"/><g transform="translate(17.5 18) scale(0.82)"><circle r="6.2" fill="var(--bg-2)"/><path fill="currentColor" d="M 0 -5.2 L 1.45 -3.51 L 3.68 -3.68 L 3.51 -1.45 L 5.2 0 L 3.51 1.45 L 3.68 3.68 L 1.45 3.51 L 0 5.2 L -1.45 3.51 L -3.68 3.68 L -3.51 1.45 L -5.2 0 L -3.51 -1.45 L -3.68 -3.68 L -1.45 -3.51 Z"/><circle r="1.7" fill="var(--bg-2)"/></g></svg>
+                                    <span class="card-act-label" data-i18n="ui_cardbar_category_manager">Category Manager</span>
+                                </button>
+                                <button class="card-act card-act-ico-btn focusable" id="seriesCardManageContent" data-focus-key="series-card-manage-content" tabindex="-1" aria-label="Manage Locks">
+                                    <svg class="card-act-ico" viewBox="0 0 24 24" width="24" height="24" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1.5" fill="none" stroke="currentColor" stroke-width="2"/><rect x="14" y="3" width="7" height="7" rx="1.5" fill="none" stroke="currentColor" stroke-width="2"/><rect x="3" y="14" width="7" height="7" rx="1.5" fill="none" stroke="currentColor" stroke-width="2"/><g transform="translate(17.5 17.5) scale(0.82)"><circle r="6.2" fill="var(--bg-2)"/><path fill="currentColor" d="M 0 -5.2 L 1.45 -3.51 L 3.68 -3.68 L 3.51 -1.45 L 5.2 0 L 3.51 1.45 L 3.68 3.68 L 1.45 3.51 L 0 5.2 L -1.45 3.51 L -3.68 3.68 L -3.51 1.45 L -5.2 0 L -3.51 -1.45 L -3.68 -3.68 L -1.45 -3.51 Z"/><circle r="1.7" fill="var(--bg-2)"/></g></svg>
+                                    <span class="card-act-label" data-i18n="ui_cardbar_content_manager">Content Manager</span>
+                                </button>
+                            </div>
+                            <div class="panel-ch-head">
+                                <span class="panel-ch-title" id="seriesCatTitle" data-i18n="ui_series_in_current_category">Series in Current Category</span>
+                                <button class="cat-manage-btn focusable content-lock-btn" id="seriesManageContent" data-focus-key="series-manage-content" tabindex="-1" data-i18n="ui_manage_locks">Manage Locks</button>
+                            </div>
+                            <div class="panel-search">
+                                <input type="text" class="field focusable" id="seriesSearchField" data-focus-key="series-search" placeholder="Search series..." data-i18n-placeholder="ui_ph_search_series" readonly>
+                            </div>
+                            <div class="panel-ch-list" id="seriesList"></div>
+                        </div>
+                        <div class="panel-col panel-info focusable" id="seriesInfo" data-focus-key="series-info" tabindex="-1">
+                            <div class="vod-poster" id="seriesPoster"></div>
+                            <button class="vod-info-play focusable" id="seriesInfoPlay" data-focus-key="series-info-play" tabindex="-1">
+                                <svg class="vod-play-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z" fill="currentColor"/></svg>
+                                <span class="vod-play-lbl" data-i18n="ui_view_episodes">View Episodes</span>
+                            </button>
+                            <div class="vod-info-body">
+                                <div class="vod-title" id="seriesTitle"></div>
+                                <div class="vod-meta" id="seriesMeta"></div>
+                                <div class="vod-rating" id="seriesRating"></div>
+                                <div class="vod-genre" id="seriesGenre"></div>
+                                <div class="vod-desc" id="seriesDesc"></div>
+                                <div class="vod-cast" id="seriesCast"></div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Sources management -->
+                <section class="content-section" data-section-content="playlists">
+                    <header class="section-head">
+                        <h2 class="section-title" data-i18n="ui_playlists">Sources</h2>
+                        <div class="section-meta">
+                            <button class="btn focusable" id="plAdd" data-focus-key="pl-add" data-i18n="ui_add_playlist">+ Add Source</button>
+                            <button class="btn focusable" id="plPair" data-focus-key="pl-pair" data-i18n="ui_pair_via_code">Pair via Code</button>
+                            <button class="btn danger focusable" id="plDeleteAll" data-focus-key="pl-del-all" data-i18n="ui_delete_all">Delete All</button>
+                        </div>
+                    </header>
+                    <div class="pl-list" id="plList"></div>
+                    <div class="section-hint" id="plHint" data-i18n="ui_press_ok_on_any_playlist_to">Press OK on any source to manage it.</div>
+                    <div class="pl-epg-override">
+                        <div class="setting-row">
+                            <div class="setting-label"><span data-i18n="ui_external_epg_sources">External EPG Sources</span><div class="setting-desc" data-i18n="ui_manage_up_to_3_external_xmltv">Manage up to 3 external XMLTV sources. They load after the provider EPG and fill missing programme data only.</div></div>
+                            <div class="setting-ctl">
+                                <button class="btn focusable" id="setEpgManage" data-focus-key="set-epg-manage" tabindex="-1" data-i18n="ui_manage_epg_sources">Manage EPG Sources</button>
+                                <div class="setting-desc" id="setEpgSummary"></div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Catch-up: Xtream channels with a TV archive on the left, their past programmes on the right. -->
+                <section class="content-section" data-section-content="catchup">
+                    <header class="section-head"><h2 class="section-title" data-i18n="cu_title">Catch-up</h2></header>
+                    <div class="cu-wrap">
+                        <div class="cu-col cu-chans">
+                            <div class="cu-colhead" data-i18n="cu_channels">Channels with catch-up</div>
+                            <div class="cu-tools">
+                                <input type="text" class="field focusable cu-filter" id="cuFilter" data-focus-key="cu-filter" placeholder="Filter channels..." data-i18n-placeholder="cu_filter_ph" readonly>
+                                <button class="btn focusable cu-sort" id="cuSort" data-focus-key="cu-sort" tabindex="-1" data-i18n="pc_sort">Sort</button>
+                                <button class="btn focusable cu-hiddenbtn" id="cuHidden" data-focus-key="cu-hidden" tabindex="-1" style="display:none"></button>
+                            </div>
+                            <div class="cu-list" id="cuChans"></div>
+                        </div>
+                        <div class="cu-col cu-progs">
+                            <div class="cu-colhead" id="cuProgHead"></div>
+                            <div class="fav-tabs cu-daytabs" id="cuDays"></div>
+                            <div class="cu-list" id="cuProgs"></div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Sports: 7-day schedule/scores (pairing server feed), sport/team filter, EPG matching. -->
+                <section class="content-section" data-section-content="sports">
+                    <header class="section-head">
+                        <h2 class="section-title" data-i18n="ui_sports">Sports</h2>
+                        <div class="section-meta">
+                            <button class="btn focusable sp-head-btn" id="spMode" data-focus-key="sp-mode" tabindex="-1"></button>
+                            <button class="btn focusable sp-head-btn" id="spFilter" data-focus-key="sp-filter" tabindex="-1" data-i18n="sp_filter">Filter</button>
+                            <button class="btn focusable sp-head-btn" id="spRefresh" data-focus-key="sp-refresh" tabindex="-1" data-i18n="sp_refresh">Refresh</button>
+                        </div>
+                    </header>
+                    <div class="fav-tabs sp-days" id="spDays"></div>
+                    <div class="fav-tabs sp-days sp-when" id="spWhen"></div>
+                    <div class="sp-list" id="spList"></div>
+                    <div class="section-hint" id="spHint"></div>
+                </section>
+
+                <!-- Parental Controls -->
+                <section class="content-section" data-section-content="parental">
+                    <header class="section-head"><h2 class="section-title" data-i18n="ui_parental_controls">Parental Controls</h2></header>
+                    <div class="parental-status" id="parentalStatus" data-i18n="ui_parental_controls_are_off">Parental controls are off.</div>
+                    <div class="parental-actions">
+                        <button class="btn focusable" id="parentalEnable" data-focus-key="parental-enable" data-i18n="ui_enable_change_pin">Enable / Change PIN</button>
+                        <button class="btn focusable" id="parentalDisable" data-focus-key="parental-disable" data-i18n="ui_disable">Disable</button>
+                    </div>
+                    <div class="settings-grid">
+                        <div class="setting-row">
+                            <div class="setting-label"><span data-i18n="ui_app_launch_lock">App Launch Lock</span><div class="setting-desc" data-i18n="ui_require_pin_after_app_restart_or">Require PIN after app restart or after the unlock session expires.</div></div>
+                            <div class="setting-ctl"><select class="field focusable" id="parentalStartup" data-focus-key="parental-startup"><option value="off" data-i18n="ui_off">Off</option><option value="on" data-i18n="ui_on">On</option></select></div>
+                        </div>
+                        <div class="setting-row">
+                            <div class="setting-label"><span data-i18n="ui_restrict_playback">Restrict Playback</span><div class="setting-desc" data-i18n="ui_require_pin_to_play_any_channel">Require PIN to play any channel or content, across all categories. Independent of individual content/category locks.</div></div>
+                            <div class="setting-ctl"><select class="field focusable" id="parentalRestrictPlayback" data-focus-key="parental-restrict-playback"><option value="off" data-i18n="ui_off">Off</option><option value="on" data-i18n="ui_on">On</option></select></div>
+                        </div>
+                        <div class="setting-row">
+                            <div class="setting-label"><span data-i18n="ui_protected_actions">Protected Actions</span><div class="setting-desc" data-i18n="ui_require_pin_for_playlist_changes_sync">Require PIN for source changes, sync actions, data wipes and protected settings.</div></div>
+                            <div class="setting-ctl"><select class="field focusable" id="parentalProtectActions" data-focus-key="parental-actions"><option value="on" data-i18n="ui_on">On</option><option value="off" data-i18n="ui_off">Off</option></select></div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Settings -->
+                <section class="content-section" data-section-content="settings">
+                    <header class="section-head"><h2 class="section-title" data-i18n="ui_settings">Settings</h2></header>
+                    <div class="settings-grid" id="settingsGrid">
+                        <div class="setting-row">
+                            <div class="setting-label"><span data-i18n="ui_performance_mode_2">Performance Mode</span><div class="setting-desc" data-i18n="ui_lite_reduces_work_on_slower_tvs">Lite reduces work on slower devices: smaller data chunks with more pauses, fewer images at once, a 1-day guide, and no background preloading of movies/series. Auto picks for you based on the device. Choose Lite if the app feels sluggish, or Normal to keep everything at full detail.</div></div>
+                            <div class="setting-ctl">
+                                <select class="field focusable" id="setPerfMode" data-focus-key="set-perf-mode">
+                                    <option value="auto" data-i18n="ui_auto_recommended">Auto (recommended)</option>
+                                    <option value="normal" data-i18n="ui_normal">Normal</option>
+                                    <option value="lite" data-i18n="ui_lite">Lite</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="setting-row">
+                            <div class="setting-label"><span data-i18n="ui_language">Language</span><div class="setting-desc" data-i18n="ui_changes_the_language_of_the_app">Changes the language of the app's own text — menus, buttons and messages. Channel, movie and series names come from your provider and are not translated. The app will reload when you change this.</div></div>
+                            <div class="setting-ctl">
+                                <!-- Was a native <select>. The native popup showed
+                                     a scrollbar we couldn't style away on the webOS
+                                     engine AND could hang/crash the app if left open.
+                                     Replaced with a button that opens the app's own
+                                     modal list picker (focusable, no native popup).
+                                     Options still come from I18n.getLanguages(). -->
+                                <button class="field focusable" id="setLanguage" data-focus-key="set-language" tabindex="-1"></button>
+                            </div>
+                        </div>
+                        <div class="setting-row">
+                            <div class="setting-label"><span data-i18n="ui_text_size">Text Size</span><div class="setting-desc" data-i18n="ui_scale_everything_in_the_app_up">Scale everything in the app up or down for easier reading. Affects channel lists, the guide, settings, and the on-screen keyboard. Video playback is not affected.</div></div>
+                            <div class="setting-ctl">
+                                <select class="field focusable" id="setTextSize" data-focus-key="set-text-size">
+                                    <option value="xsmall" data-i18n="ui_extra_small_20">Extra Small (-20%)</option>
+                                    <option value="small" data-i18n="ui_small_10">Small (-10%)</option>
+                                    <option value="normal" data-i18n="ui_normal">Normal</option>
+                                    <option value="large" data-i18n="ui_large_10">Large (+10%)</option>
+                                    <option value="xlarge" data-i18n="ui_extra_large_20">Extra Large (+20%)</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="setting-row" id="rowScreenMargin">
+                            <div class="setting-label"><span data-i18n="ui_screen_margin">Screen Margin</span><div class="setting-desc" data-i18n="ui_screen_margin_desc">Pulls the whole app in from the edges of the screen. Use it if your screen cuts off the edges of the picture. Off uses the full screen.</div></div>
+                            <div class="setting-ctl">
+                                <select class="field focusable" id="setScreenMargin" data-focus-key="set-screen-margin">
+                                    <option value="off" data-i18n="ui_off">Off</option>
+                                    <option value="2">2%</option>
+                                    <option value="4">4%</option>
+                                    <option value="6">6%</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="setting-row" id="rowBufferReserve">
+                            <div class="setting-label"><span data-i18n="ui_playback_buffer">Playback Buffer</span><div class="setting-desc" data-i18n="ui_playback_buffer_desc">Extra video kept ready ahead of what you are watching, to ride out short network or provider dropouts. Standard starts fastest and keeps live channels closest to live. A larger buffer uses more memory and live channels may play a little behind live. What you actually get depends on your device memory and your provider.</div></div>
+                            <div class="setting-ctl">
+                                <select class="field focusable" id="setBufferReserve" data-focus-key="set-buffer-reserve">
+                                    <option value="off" data-i18n="ui_buffer_standard">Standard</option>
+                                    <option value="45">45 s</option>
+                                    <option value="60">60 s</option>
+                                    <option value="90">90 s</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="setting-row" id="rowPlayerPref">
+                            <div class="setting-label"><span data-i18n="ui_preferred_player">Preferred Player</span><div class="setting-desc" data-i18n="ui_auto_native_on_tvs_hardware_decoder">Auto: native on devices (hardware decoder, supports HEVC + most live streams); hls.js on desktop browsers. Native: always uses the device/browser's built-in player. HLS Only: forces hls.js (rarely useful on a device — won't play HEVC).</div></div>
+                            <div class="setting-ctl">
+                                <select class="field focusable" id="setPlayer" data-focus-key="set-player">
+                                    <option value="auto" data-i18n="ui_auto_recommended">Auto (recommended)</option>
+                                    <option value="native" data-i18n="ui_native_only">Native Only</option>
+                                    <option value="hlsjs" data-i18n="ui_hls_only">HLS Only</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="setting-row" id="rowTheme">
+                            <div class="setting-label"><span data-i18n="ui_theme">Theme</span><div class="setting-desc" data-i18n="ui_theme_desc">Choose a dark or light appearance, or follow the device setting. Video playback always stays dark.</div></div>
+                            <div class="setting-ctl">
+                                <select class="field focusable" id="setTheme" data-focus-key="set-theme">
+                                    <option value="dark" data-i18n="ui_theme_dark">Dark (default)</option>
+                                    <option value="light" data-i18n="ui_theme_light">Light</option>
+                                    <option value="system" data-i18n="ui_theme_system">Follow System</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="setting-row" id="rowTouchMode">
+                            <div class="setting-label"><span data-i18n="ui_touch_remote_mode">Touch / Remote Mode</span><div class="setting-desc" data-i18n="ui_touch_mode_desc">Some devices misreport whether they have a touchscreen, which can turn on phone-style gestures and layout on a device with no touchscreen at all (or the reverse). If the app doesn't match how you're actually controlling this device, override it here. Auto uses the device's own reported capability. The app will reload when you change this.</div></div>
+                            <div class="setting-ctl">
+                                <select class="field focusable" id="setTouchMode" data-focus-key="set-touch-mode">
+                                    <option value="auto" data-i18n="ui_auto_recommended">Auto (recommended)</option>
+                                    <option value="touch" data-i18n="ui_touch_force">Touch (phone/tablet)</option>
+                                    <option value="remote" data-i18n="ui_remote_force">Remote / Keyboard</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="setting-row">
+                            <div class="setting-label"><span data-i18n="ui_video_scaling">Video Scaling</span><div class="setting-desc" data-i18n="ui_how_the_video_fits_the_screen">How the video fits the screen. Contain shows full picture, Cover zooms/crops, Stretch Height targets cinema letterbox, Stretch Width targets classic 4:3 pillarbox.</div></div>
+                            <div class="setting-ctl">
+                                <select class="field focusable" id="setScale" data-focus-key="set-scale">
+                                    <option value="contain" data-i18n="ui_contain_default">Contain (default)</option>
+                                    <option value="cover" data-i18n="ui_cover_fill">Cover (fill &amp; crop)</option>
+                                    <option value="fill-v" data-i18n="ui_stretch_height_cinema_2_4_1">Stretch Height (Cinema 2.4:1)</option>
+                                    <option value="fill-h" data-i18n="ui_stretch_width_classic_4_3">Stretch Width (Classic 4:3)</option>
+                                    <option value="four-three" data-i18n="ui_shrink_to_4_3_pillarbox">Shrink to 4:3 (Pillarbox)</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="setting-row">
+                            <div class="setting-label"><span data-i18n="ui_view_movies_series">Movies &amp; Series View</span><div class="setting-desc" data-i18n="ui_view_movies_series_desc">List shows a category list with title rows. Cards shows a poster grid with a category dropdown.</div></div>
+                            <div class="setting-ctl">
+                                <select class="field focusable" id="setViewVod" data-focus-key="set-view-vod">
+                                    <option value="list" data-i18n="ui_view_list">List</option>
+                                    <option value="card" data-i18n="ui_view_cards">Cards</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="setting-row">
+                            <div class="setting-label"><span data-i18n="ui_view_live">Live TV View</span><div class="setting-desc" data-i18n="ui_view_live_desc">List shows the guide-integrated channel rows. Cards shows a channel logo grid with a mini player and now/next; the full guide stays in List.</div></div>
+                            <div class="setting-ctl">
+                                <select class="field focusable" id="setViewLive" data-focus-key="set-view-live">
+                                    <option value="list" data-i18n="ui_view_list">List</option>
+                                    <option value="card" data-i18n="ui_view_cards">Cards</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="setting-row">
+                            <div class="setting-label"><span data-i18n="ui_info_overlay_duration">Info Overlay Duration</span><div class="setting-desc" data-i18n="ui_info_overlay_desc">How long the channel and programme info bar stays on screen after you change channels. Choose Always to keep it visible.</div></div>
+                            <div class="setting-ctl">
+                                <select class="field focusable" id="setOverlay" data-focus-key="set-overlay">
+                                    <option value="3000" data-i18n="ui_3_seconds">3 seconds</option>
+                                    <option value="5000" data-i18n="ui_5_seconds">5 seconds</option>
+                                    <option value="7000" data-i18n="ui_7_seconds">7 seconds</option>
+                                    <option value="0" data-i18n="ui_always">Always</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="setting-row">
+                            <div class="setting-label"><span data-i18n="ui_player_clock">Clock on Player</span><div class="setting-desc" data-i18n="ui_player_clock_desc">Show the time in the corner of the picture while watching. Off keeps the clock in the info overlay only.</div></div>
+                            <div class="setting-ctl">
+                                <select class="field focusable" id="setPlayerClock" data-focus-key="set-player-clock">
+                                    <option value="off" data-i18n="ui_clock_overlay_only">Info overlay only</option>
+                                    <option value="always" data-i18n="ui_always">Always</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="setting-row" id="rowAfr">
+                            <div class="setting-label"><span data-i18n="ui_match_frame_rate">Match Frame Rate</span><div class="setting-desc" data-i18n="ui_match_frame_rate_desc">Switch the TV to the refresh rate of the video (for example 24, 25 or 50 Hz) so motion is smooth. Seamless only changes when the TV can do it without a blank screen. Always may blank the screen for a second when a stream starts. Needs a TV or box that supports it.</div></div>
+                            <div class="setting-ctl">
+                                <select class="field focusable" id="setAfr" data-focus-key="set-afr">
+                                    <option value="off" data-i18n="ui_off">Off</option>
+                                    <option value="seamless" data-i18n="ui_afr_seamless">Seamless only</option>
+                                    <option value="always" data-i18n="ui_always">Always</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="setting-row">
+                            <div class="setting-label"><span data-i18n="ui_resume_last_channel">Resume Last Channel</span><div class="setting-desc" data-i18n="ui_automatically_start_playing_the_last_watched">Automatically start playing the last watched channel when the app opens.</div></div>
+                            <div class="setting-ctl">
+                                <select class="field focusable" id="setAutoResume" data-focus-key="set-autoresume">
+                                    <option value="off" data-i18n="ui_off">Off</option>
+                                    <option value="on" data-i18n="ui_on">On</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="setting-row">
+                            <div class="setting-label"><span data-i18n="ui_cache_vod_catalogue">Cache Movies &amp; Series</span><div class="setting-desc" data-i18n="ui_cache_vod_desc">Keep the Movies and Series catalogue on this device so the app opens without re-downloading it every time. It refreshes automatically after 30 days, when you change the playlist's source, or when you refresh the playlist manually. Turn off if you prefer a fresh download on every launch.</div></div>
+                            <div class="setting-ctl">
+                                <select class="field focusable" id="setCacheVod" data-focus-key="set-cache-vod">
+                                    <option value="off" data-i18n="ui_off">Off</option>
+                                    <option value="on" data-i18n="ui_on">On</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="setting-row" id="syncRow">
+                            <div class="setting-label"><span data-i18n="ui_cloud_sync">Cloud Sync</span><div class="setting-desc" id="syncDesc" data-i18n="ui_sign_in_to_sync_your_playlists">Sign in to sync your sources, favorites, watch history, category order, hidden &amp; locked categories, and subtitle preferences across all your devices. Free and optional.</div></div>
+                            <div class="setting-ctl">
+                                <div id="syncStatus">
+                                    <button class="btn focusable" id="syncLoginBtn" data-focus-key="set-login" tabindex="-1" data-i18n="ui_sign_in">Sign In</button>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="setting-row init-hidden" id="syncActions">
+                            <div class="setting-label" data-i18n="ui_sync_actions">Sync Actions</div>
+                            <div class="setting-ctl sync-ctl-wrap">
+                                <!-- Single-column stack (see components.css). Vertical focus chain
+                                     top-to-bottom; left/right are dead-ends (__none__) since there
+                                     are no horizontal neighbours. -->
+                                <button class="btn focusable btn-half" id="syncPushBtn" data-focus-key="sync-push" tabindex="-1" data-i18n="ui_push_to_cloud">Push to Cloud</button>
+                                <button class="btn focusable btn-half" id="syncPullBtn" data-focus-key="sync-pull" tabindex="-1" data-i18n="ui_pull_from_cloud">Pull from Cloud</button>
+                                <button class="btn focusable btn-half" id="syncForgotBtn" data-focus-key="sync-forgot" tabindex="-1" data-i18n="ui_reset_password">Reset Password</button>
+                                <button class="btn focusable btn-half" id="syncLogoutBtn" data-focus-key="sync-logout" tabindex="-1" data-i18n="ui_sign_out">Sign Out</button>
+                                <button class="btn focusable danger btn-full-m" id="syncWipeCloudBtn" data-focus-key="sync-wipe-cloud" tabindex="-1" data-i18n="ui_wipe_cloud_data">Wipe Cloud Data</button>
+                                <button class="btn focusable danger btn-full-m" id="syncDeleteAccountBtn" data-focus-key="sync-delete-account" tabindex="-1" data-i18n="ui_delete_cloud_account">Delete Cloud Account</button>
+                            </div>
+                        </div>
+                        <div class="setting-row init-hidden" id="zkSyncRow">
+                            <div class="setting-label"><span data-i18n="ui_zero_knowledge_credential_sync">Zero-Knowledge Credential Sync</span><div class="setting-desc" id="zkSyncDesc" data-i18n="ui_off_by_default_provider_passwords_are">Off by default, provider passwords are never synced. Turn this on to sync them end-to-end encrypted with a passphrase only you know. The passphrase is never sent to the server and cannot be recovered if lost.</div></div>
+                            <div class="setting-ctl">
+                                <button class="btn focusable" id="zkToggleBtn" data-focus-key="zk-toggle" tabindex="-1" data-i18n="ui_set_up">Set Up</button>
+                            </div>
+                        </div>
+                        <div class="setting-row">
+                            <div class="setting-label" data-i18n="ui_app_version">App Version</div>
+                            <div class="setting-ctl"><span class="mono" id="appVerVal">1.0.12</span></div>
+                        </div>
+                        <div class="setting-row init-hidden" id="updateRow">
+                            <div class="setting-label"><span data-i18n="ui_update_check">Check for Updates</span><div class="setting-desc" id="updateDesc"></div></div>
+                            <div class="setting-ctl"><button class="btn focusable" id="updateCheckBtn" data-focus-key="update-check" tabindex="-1" data-i18n="ui_update_check_btn">Check Now</button></div>
+                        </div>
+                        <div class="setting-row">
+                            <div class="setting-label" data-i18n="ui_reset_application">Reset Application</div>
+                            <!-- Explicit data-focus-up: from Wipe All Data, Up must
+                                 reach Delete Cloud Account (last button of the sync
+                                 group in the row above). The sync buttons live in a
+                                 different container than this setting-ctl, so their
+                                 horizontal extents don't reliably overlap this button's
+                                 beam and spatial projection can pick Push to Cloud
+                                 instead. If the user isn't signed in (sync-actions
+                                 hidden), the target is absent and focus falls through
+                                 to spatial nav. -->
+                            <div class="setting-ctl"><button class="btn danger focusable w-full" id="setReset" data-focus-key="set-reset" data-focus-up="sync-delete-account" data-i18n="ui_wipe_all_data">Wipe All Data</button></div>
+                        </div>
+                    </div>
+                </section>
+            </main>
+        </div>
+
+        <!-- Player screen -->
+        <div id="player" class="screen">
+            <div class="player-stage">
+                <video id="videoEl" autoplay playsinline></video>
+                <div class="sub-overlay" id="subOverlay" aria-hidden="true"></div>
+                <div class="player-loading" id="playerLoading">
+                    <div class="spinner"></div>
+                    <div class="ploading-text" data-i18n="ui_loading_stream">Loading stream...</div>
+                </div>
+                <div class="player-clock" id="playerClock" aria-hidden="true" style="display:none"></div>
+                <div class="player-error hidden" id="playerError">
+                    <div class="perr-ic">!</div>
+                    <div class="perr-text" data-i18n="ui_stream_could_not_be_played">Stream could not be played.</div>
+                    <div class="perr-sub" id="perrSub"></div>
+                    <div class="perr-code" id="perrCode"></div>
+                </div>
+            </div>
+
+            <!-- Info Overlay -->
+            <div class="info-overlay" id="infoOverlay">
+                <!-- Prev/next-channel (mobile touch only, revealed by wirePlayerOverlay when
+                     Mobile.isTouch() — replaces the old swipe-left/right-to-change-channel
+                     gesture, see app.js). Live TV only; hidden for Movies/Series (no "channel"
+                     concept there) via player.js's per-refresh content-type toggle, same as
+                     everything else here. Positioned independently near the screen edges, NOT
+                     as part of #infoTransport's centered rew/play/fwd group — off to each side,
+                     not inline with the other controls. Same .show-gated pointer-events pattern
+                     as #infoTransport below (see that comment): invisible but still interactive
+                     would let a swipe-up gesture land on a hidden button instead of revealing
+                     the overlay. -->
+                <button class="transport-btn transport-edge-btn transport-edge-left focusable init-hidden" id="infoPrevChBtn" data-focus-key="info-prev-ch" tabindex="-1" title="Previous Channel">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15,18 9,12 15,6"/></svg>
+                </button>
+                <button class="transport-btn transport-edge-btn transport-edge-right focusable init-hidden" id="infoNextChBtn" data-focus-key="info-next-ch" tabindex="-1" title="Next Channel">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9,18 15,12 9,6"/></svg>
+                </button>
+
+                <!-- Transport controls (VOD only) — centered above seekbar -->
+                <div class="info-transport init-hidden" id="infoTransport">
+                    <button class="transport-btn focusable" id="infoRewBtn" data-focus-key="info-rew" tabindex="-1">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M1 4v6h6"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/><text x="12" y="16" text-anchor="middle" font-size="9" font-weight="800" fill="currentColor" stroke="none">10</text></svg>
+                    </button>
+                    <button class="transport-btn transport-play focusable" id="infoPlayBtn" data-focus-key="info-play" tabindex="-1">
+                        <svg viewBox="0 0 24 24" fill="currentColor" id="infoPlayIc"><path d="M6 4h4v16H6zm8 0h4v16h-4z"/></svg>
+                    </button>
+                    <button class="transport-btn focusable" id="infoFwdBtn" data-focus-key="info-fwd" tabindex="-1">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M23 4v6h-6"/><path d="M20.49 15a9 9 0 1 1-2.13-9.36L23 10"/><text x="12" y="16" text-anchor="middle" font-size="9" font-weight="800" fill="currentColor" stroke="none">10</text></svg>
+                    </button>
+                </div>
+
+                <!-- Bottom bar -->
+                <div class="info-bottom">
+                    <!-- Top bar: channel/title + time -->
+                    <div class="info-top">
+                        <div class="info-num" id="infoNum"></div>
+                        <div class="info-main">
+                            <div class="info-name" id="infoName" data-i18n="ui_channel">Channel</div>
+                            <div class="info-meta">
+                                <span id="infoCat"></span>
+                                <span class="sep">&bull;</span>
+                                <span id="infoPl"></span>
+                                <span class="sep init-hidden" id="infoResSep">&bull;</span>
+                                <span id="infoRes"></span>
+                            </div>
+                        </div>
+                        <div class="info-time" id="infoTime">--:--</div>
+                    </div>
+
+                    <!-- EPG block (Live TV only) -->
+                    <div class="info-epg" id="infoEpgBlock">
+                        <div class="info-now">
+                            <div class="iepg-lbl" data-i18n="ui_now">NOW</div>
+                            <div class="iepg-title" id="epgNowTitle" data-i18n="ui_no_program_info">No program info</div>
+                            <div class="iepg-time" id="epgNowTime"></div>
+                            <div class="iepg-prog"><div class="iepg-prog-fill" id="epgNowProg"></div></div>
+                        </div>
+                        <div class="info-next">
+                            <div class="iepg-lbl" data-i18n="ui_next">NEXT</div>
+                            <div class="iepg-title" id="epgNextTitle">-</div>
+                            <div class="iepg-time" id="epgNextTime"></div>
+                        </div>
+                    </div>
+
+                    <!-- VOD seekbar (Movies/Series only) -->
+                    <div class="info-seekbar init-hidden" id="infoSeekBlock">
+                        <div class="seek-times">
+                            <span class="seek-elapsed" id="seekElapsed">0:00</span>
+                            <span class="seek-total" id="seekTotal">0:00</span>
+                        </div>
+                        <div class="seek-track focusable" id="seekTrack" data-focus-key="info-seek" tabindex="-1">
+                            <div class="seek-buf" id="seekBuf"></div>
+                            <div class="seek-fill" id="seekFill"></div>
+                            <div class="seek-thumb" id="seekThumb"></div>
+                        </div>
+                    </div>
+
+                    <!-- Aux action buttons -->
+                    <div class="info-actions" id="infoActions">
+                        <button class="info-action focusable" id="infoSubBtn" data-focus-key="info-subs" tabindex="-1">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="5" y1="12" x2="11" y2="12"/><line x1="13" y1="12" x2="19" y2="12"/><line x1="5" y1="16" x2="15" y2="16"/></svg>
+                            <span data-i18n="ui_subtitles">Subtitles</span>
+                        </button>
+                        <button class="info-action focusable" id="infoAudioBtn" data-focus-key="info-audio" tabindex="-1">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 5L6 9H2v6h4l5 4V5z"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/></svg>
+                            <span data-i18n="ui_audio">Audio</span>
+                        </button>
+                        <button class="info-action focusable" id="infoFavBtn" data-focus-key="info-fav" tabindex="-1">
+                            <svg id="infoFavIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M12 2.5l2.9 5.9 6.5.95-4.7 4.58 1.11 6.47L12 17.9l-5.81 3.06 1.11-6.47-4.7-4.58 6.5-.95z"/></svg>
+                            <span id="infoFavLbl" data-i18n="ui_favorite">Favorite</span>
+                        </button>
+                        <button class="info-action focusable" id="infoScaleBtn" data-focus-key="info-scale" tabindex="-1">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15,3 21,3 21,9"/><polyline points="9,21 3,21 3,15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg>
+                            <span data-i18n="ui_scale">Scale</span>
+                        </button>
+                        <button class="info-action focusable init-hidden" id="infoSpeedBtn" data-focus-key="info-speed" tabindex="-1">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12,6 12,12 16,14"/></svg>
+                            <span id="infoSpeedLbl" data-i18n="ui_speed">Speed</span>
+                        </button>
+                        <button class="info-action focusable init-hidden" id="infoMiniBtn" data-focus-key="info-mini" tabindex="-1">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
+                            <span data-i18n="ui_channels_2">Channels</span>
+                        </button>
+                        <!-- Mobile only (revealed by wirePlayerOverlay when Mobile.isTouch()) — hand
+                             the current stream off to another app (VLC, MX Player, etc.) via the
+                             system's own chooser. Kept LAST in this row deliberately. -->
+                        <button class="info-action focusable init-hidden" id="infoExternalBtn" data-focus-key="info-external" tabindex="-1">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15,3 21,3 21,9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+                            <span data-i18n="ui_open_external">Open In Player</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Mini channel list (opens with UP) -->
+            <div class="mini-channels" id="miniChannels">
+                <div class="mini-head" data-i18n="ui_channels_2">Channels</div>
+                <div class="mini-list" id="miniList"></div>
+            </div>
+        </div>
+
+        <!-- Modal container -->
+        <div id="modalLayer" class="modal-layer hidden">
+            <div class="modal-card">
+                <div class="modal-title" id="modalTitle" data-i18n="ui_confirm">Confirm</div>
+                <div class="modal-body" id="modalBody" data-i18n="ui_message">Message</div>
+                <div class="modal-actions">
+                    <button class="btn focusable" id="modalOk" data-focus-key="modal-ok" data-i18n="ui_ok">OK</button>
+                    <button class="btn focusable" id="modalCancel" data-focus-key="modal-cancel" data-i18n="ui_cancel">Cancel</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Virtual keyboard (global, outside any screen) -->
+        <div id="vkeyboard" class="vkeyboard hidden"></div>
+
+        <!-- Toast -->
+        <div id="toast" class="toast hidden"></div>
+
+        <!-- Exit confirmation -->
+        <div id="exitDialog" class="exit-dialog hidden">
+            <div class="exit-dialog-box">
+                <div class="exit-dialog-title" data-i18n="ui_exit_app">Exit App</div>
+                <div class="exit-dialog-actions">
+                    <button class="btn focusable" id="exitYes" data-focus-key="exit-yes" data-i18n="ui_yes_exit">Yes, Exit</button>
+                    <button class="btn focusable" id="exitNo" data-focus-key="exit-no" data-i18n="ui_cancel">Cancel</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Dynamic TV scale: DISABLED. The app canvas (window.innerWidth) is always
+         the coordinate space the CSS is authored for — 1920 for the default/UHD
+         package, 1280 for a 1280x720 package. webOS composites that canvas onto the
+         physical panel itself, so the app never scales its own coordinate space
+         (scaling it would only shrink the layout). Text/control sizing for viewing
+         distance is --ui-scale's job and does not touch layout size.
+
+         This block is assertion-only: if innerWidth is ever a canvas we do not
+         author for, log it so we notice — but never transform. (screen.width is the
+         wrong signal: it reports the physical panel, e.g. 3840 on a 4K set running
+         the 1080 package, not the app canvas.) -->
+    <script type="text/javascript">
+    (function(){
+        try {
+            var cw = window.innerWidth || 0;
+            // 1920 (default/UHD build) and 1280 (FHD build) are the only canvases we
+            // author for. Anything else means an appinfo resolution we have not
+            // styled — surface it in the log rather than silently misrendering.
+            if (cw && cw !== 1920 && cw !== 1280) {
+                if (window.console && console.warn) {
+                    console.warn('[scale] unexpected app canvas width ' + cw +
+                        ' — CSS is authored for 1280 or 1920 only.');
+                }
+            }
+        } catch(e) {}
+    })();
+    </script>
+
+    <!-- Global error handler -->
+    <script type="text/javascript">
+    window.onerror = function(msg, url, line, col, err) {
+        try {
+            if (window.console && console.error) {
+                console.error('[GLOBAL ERROR]', msg, url, line, col, err);
+            }
+            var d = document.getElementById('toast');
+            if (d) {
+                d.textContent = 'Something went wrong. Please try again.';
+                d.className = 'toast show err';
+            }
+        } catch(e) {}
+    };
+    </script>
+
+    <!-- Scripts: ordered carefully for ES5 compatibility -->
+    <script type="text/javascript" src="assets/js/polyfills.js"></script>
+    <script type="text/javascript" src="assets/js/config.js"></script>
+    <script type="text/javascript" src="assets/js/util.js"></script>
+    <!-- i18n must come before ANY module that calls T(). i18n.js defines the
+         registry and the T() alias; en.js then registers the fallback table.
+         English is bundled (not lazily fetched) so that a failed or missing
+         language file degrades to readable English rather than raw keys.
+         The ACTIVE non-English table is injected at runtime by app.js — only one
+         is ever resident, because 20 tables in memory is a few hundred KB on a
+         device that is already tight on heap. -->
+    <script type="text/javascript" src="assets/js/i18n.js"></script>
+    <script type="text/javascript" src="assets/lang/en.js"></script>
+    <script type="text/javascript" src="assets/js/qrcode.js"></script>
+    <script type="text/javascript" src="assets/js/hls.min.js"></script>
+    <!-- Firebase SDK (loaded only if enabled in config) -->
+    <script type="text/javascript">
+    (function(){
+        if (typeof APP_CONFIG !== 'undefined' && APP_CONFIG.FIREBASE && APP_CONFIG.FIREBASE.enabled) {
+            /* Signal "Firebase SDK fully loaded" so
+             * CloudSync.init() can retry if it ran before the loader
+             * chain finished. Previously the chain appended database-
+             * compat with no onload hook, so CloudSync could init while
+             * firebase.database was still undefined — failing silently
+             * and leaving initialized=false. Then any subsequent
+             * sign-in attempt would error with "Not initialized".
+             *
+             * Mechanism:
+             *   1. Each script in the chain reports load via a counter.
+             *   2. When all 3 are loaded, window.__firebaseReady = true
+             *      and we dispatch 'firebase-ready' on document.
+             *   3. CloudSync listens for that event AND checks the flag
+             *      synchronously (in case it init'd late, after the
+             *      event already fired). */
+            window.__firebaseReady = false;
+            var loadedCount = 0;
+            function onSdkLoaded() {
+                loadedCount++;
+                if (loadedCount === 3) {
+                    window.__firebaseReady = true;
+                    try {
+                        document.dispatchEvent(new Event('firebase-ready'));
+                    } catch (e) {
+                        // IE11 / very old engines — use createEvent
+                        var ev = document.createEvent('Event');
+                        ev.initEvent('firebase-ready', true, true);
+                        document.dispatchEvent(ev);
+                    }
+                }
+            }
+            var s1 = document.createElement('script');
+            s1.integrity = 'sha384-ajMUFBUFMCyjh8uxJg6bkGcKe9RTolyjwbxB3yES0QQMenP3Oztj/W9vA2SJPcIh';
+            s1.crossOrigin = 'anonymous';
+            s1.src = 'https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js';
+            s1.onload = function () {
+                onSdkLoaded();
+                var s2 = document.createElement('script');
+                s2.integrity = 'sha384-xD1t9dGSVKobUztxDkv6xUI0H4AnFz0NxwlgDJJ7FDlblG9xxr1Z9iauCZuJYj6p';
+            s2.crossOrigin = 'anonymous';
+            s2.src = 'https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js';
+                s2.onload = function () {
+                    onSdkLoaded();
+                    var s3 = document.createElement('script');
+                    s3.integrity = 'sha384-f6/UpzjTjIXASlp20cArQsaRh1EvHVJd5kegy/gYR9W2D0a32TnEqUEiW4Zm/5O0';
+            s3.crossOrigin = 'anonymous';
+            s3.src = 'https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js';
+                    s3.onload = onSdkLoaded;
+                    document.head.appendChild(s3);
+                };
+                document.head.appendChild(s2);
+            };
+            document.head.appendChild(s1);
+        }
+    })();
+    </script>
+    <script type="text/javascript" src="assets/js/idb.js"></script>
+    <script type="text/javascript" src="assets/js/store.js"></script>
+    <script type="text/javascript" src="assets/js/perfconfig.js"></script>
+    <script type="text/javascript" src="assets/js/search.js"></script>
+    <script type="text/javascript" src="assets/js/live-top-mini.js"></script>
+    <script type="text/javascript" src="assets/js/portal-net.js"></script>
+    <script type="text/javascript" src="assets/js/stalker-direct.js"></script>
+    <script type="text/javascript" src="assets/js/api.js"></script>
+    <script type="text/javascript" src="assets/js/parser.js"></script>
+    <script type="text/javascript" src="assets/js/pako_inflate.min.js"></script>
+    <script type="text/javascript" src="assets/js/epg.js"></script>
+    <script type="text/javascript" src="assets/js/focus.js"></script>
+    <script type="text/javascript" src="assets/js/remote.js"></script>
+    <script type="text/javascript" src="assets/js/player-avplay.js"></script>
+    <script type="text/javascript" src="assets/js/player-exo.js"></script>
+    <script type="text/javascript" src="assets/js/player.js"></script>
+    <!-- crypto.js: log redaction only (scrubUrl strips credentials from URLs
+         before they reach debug logs). Credential encryption is zksync.js. -->
+    <script type="text/javascript" src="assets/js/crypto.js"></script>
+    <!-- Zero-knowledge credential sync (passphrase-derived, session-only key).
+         Independent of crypto.js; must load before cloudsync.js. -->
+    <script type="text/javascript" src="assets/js/zksync.js"></script>
+    <script type="text/javascript" src="assets/js/cloudsync.js"></script>
+    <script type="text/javascript" src="assets/js/subs.js"></script>
+    <script type="text/javascript" src="assets/js/imageloader.js"></script>
+    <script type="text/javascript" src="assets/js/ui.js"></script>
+    <script type="text/javascript" src="assets/js/ui-modal.js"></script>
+    <script type="text/javascript" src="assets/js/app-parental.js"></script>
+    <script type="text/javascript" src="assets/js/sports.js"></script>
+    <script type="text/javascript" src="assets/js/catchup.js"></script>
+    <script type="text/javascript" src="assets/js/catchup-screen.js"></script>
+    <!-- mobile.js: mobile/tablet detection + viewport-profile plumbing. Loads
+         after player.js (uses window.PlayerIsTvPlatform as a TV guard) and
+         before app.js (whose boot calls Mobile.applyProfile before the 720/1080
+         branch). Inert on every TV build: isMobile() is false there. -->
+    <script type="text/javascript" src="assets/js/mobile.js"></script>
+    <!-- mobile-listview.js removed: was entirely gated behind isMobile()
+         (same as mobile.css before it), which is permanently false — 100%
+         dead code, same class of removal as mobile.css. -->
+    <!-- mobile-player.js: Tier 2 — touch controls for the player (tap-to-toggle
+         overlay, draggable scrubber, double-tap seek). Reuses the public Player
+         API; no-op on TV. -->
+    <script type="text/javascript" src="assets/js/mobile-player.js"></script>
+    <script type="text/javascript" src="assets/js/app.js"></script>
+</body>
+</html>

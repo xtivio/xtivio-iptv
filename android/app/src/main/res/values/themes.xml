@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- No action bar, black background matching the web app's #0a0d1a splash,
+         fullscreen so the WebView occupies the entire TV panel. Based on the
+         framework Material theme so no AppCompat/androidx-appcompat dependency
+         is needed for this single-Activity WebView shell. -->
+    <style name="Theme.Xtivio" parent="@android:style/Theme.Material.NoActionBar">
+        <item name="android:windowBackground">@color/splash_bg</item>
+        <item name="android:windowFullscreen">true</item>
+        <item name="android:windowContentOverlay">@null</item>
+        <item name="android:statusBarColor">@color/splash_bg</item>
+        <item name="android:navigationBarColor">@color/splash_bg</item>
+    </style>
+</resources>

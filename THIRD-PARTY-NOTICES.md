@@ -1,19 +1,38 @@
 # Third-party notices
 
-The Xtivio package for Samsung TVs includes the following third-party components. Each stays under its own licence. The full texts are in the [LICENSES](LICENSES) folder and are also shipped inside the package.
+Xtivio includes or uses the following. Each keeps its own licence. Full texts are in `licenses/`.
 
-| Component | Version | Licence | Use in Xtivio |
-|---|---|---|---|
-| [hls.js](https://github.com/video-dev/hls.js) | 1.6.15 | Apache-2.0 | HLS playback where the TV's own player is not used. Bundled unmodified. |
-| [pako](https://github.com/nodeca/pako) | 2.1.0 | MIT AND Zlib | Decompresses gzip data (for example compressed guide files). |
-| [Noto Sans](https://github.com/notofonts) (Latin, Latin Extended, Cyrillic, Greek, Arabic) | as bundled | SIL Open Font License 1.1 | Interface fonts. |
+## Bundled with the web app (`web/`)
 
-Licence files: [hls.js-Apache-2.0.txt](LICENSES/hls.js-Apache-2.0.txt), [pako-MIT-and-Zlib.txt](LICENSES/pako-MIT-and-Zlib.txt), [NotoSans-OFL-1.1.txt](LICENSES/NotoSans-OFL-1.1.txt).
+| Component | Version | Licence | Copyright |
+| --- | --- | --- | --- |
+| [hls.js](https://github.com/video-dev/hls.js) | 1.6.15 | Apache-2.0 | Copyright 2017 Dailymotion and contributors |
+| [pako](https://github.com/nodeca/pako) (inflate) | 2.1.0 | MIT AND Zlib | (C) 2014-2017 Vitaly Puzrin and Andrey Tupitsin; zlib parts (C) 1995-2013 Jean-loup Gailly and Mark Adler |
+| Noto Sans (latin, latin-ext, cyrillic, greek) | as bundled | SIL Open Font License 1.1 | Copyright 2022 The Noto Project Authors (https://github.com/notofonts/latin-greek-cyrillic) |
+| Noto Sans Arabic | as bundled | SIL Open Font License 1.1 | Copyright 2022 The Noto Project Authors (https://github.com/notofonts/arabic) |
 
-## Loaded from the internet, not bundled
+`qrcode.js` is original to this project.
 
-Optional account sync uses the Firebase JavaScript SDK, which is loaded from Google's servers when needed and is covered by Google's terms and the Apache-2.0 licence.
+## Used by the Android app
 
-## Xtivio's own code
+| Component | Version | Licence |
+| --- | --- | --- |
+| AndroidX Activity, Core KTX | 1.9.3, 1.13.1 | Apache-2.0 |
+| AndroidX Media3 (ExoPlayer, HLS, datasource, common) | 1.11.0 | Apache-2.0 |
+| Kotlin standard library | as resolved by Gradle | Apache-2.0 |
 
-The QR code generator and the rest of the application are Xtivio's own work and are covered by the [Xtivio licence](LICENSE).
+## Loaded at run time (not redistributed)
+
+The Firebase JavaScript SDK (9.23.0: app, auth, database) is loaded from Google's CDN for optional cloud sync.
+It is licensed under Apache-2.0 and is not part of this repository.
+
+## Pairing server (`server/`)
+
+express, cors, express-rate-limit, helmet, https-proxy-agent and socks-proxy-agent are MIT licensed.
+firebase-admin is Apache-2.0. Their transitive dependencies are installed with `npm install` and carry their own
+licences.
+
+## Font licence note
+
+The fonts are used unmodified under the SIL Open Font License 1.1 and are not sold on their own.
+The Reserved Font Names are those declared by the Noto Project.

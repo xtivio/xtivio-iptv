@@ -1,0 +1,236 @@
+/* main.css - design tokens and layout */
+:root {
+    /* THEME. Dark is the default and is exactly the palette this file always had.
+     * Light overrides the same tokens in the :root[data-theme="light"] block below;
+     * ui.js sets data-theme on <html> (Settings > Theme: Dark / Light / Follow
+     * System). Rules that need "ink" (white on dark, near-black on light) at some
+     * opacity use rgba(var(--fg-rgb), a) rather than a literal white. The player
+     * screen re-declares the dark values (see #player below) so video always sits
+     * on a dark UI. */
+    color-scheme: dark;
+    --fg-rgb: 255,255,255;
+    --app-bg:
+        radial-gradient(1200px 800px at 12% -10%, rgba(124,92,255,0.15), transparent 60%),
+        radial-gradient(900px 700px at 110% 110%, rgba(58,209,255,0.08), transparent 55%),
+        linear-gradient(180deg, #0c1020 0%, #080c18 100%);
+    --sidebar-bg: linear-gradient(180deg, rgba(10,12,18,0.9) 0%, rgba(6,8,12,0.95) 100%);
+    --hero-bg:
+        radial-gradient(900px 500px at 100% 0%, rgba(58,209,255,0.08), transparent 55%),
+        linear-gradient(120deg, #0d1018 0%, #10131c 55%, #141925 100%);
+    --poster-bg: linear-gradient(160deg, #222838 0%, #161b26 100%);
+    --btn-bg: linear-gradient(180deg, #2a2f3f 0%, #181c26 100%);
+    --field-focus-bg: #141823;
+    --scrim: rgba(4,5,8,0.85);
+
+    /* Deep-space palette */
+    --bg-0: #06070a;
+    --bg-1: #0b0d13;
+    --bg-2: #12151d;
+    --bg-3: #1a1f2b;
+    --bg-4: #232a38;
+
+    --border: rgba(255,255,255,0.08);
+    --border-strong: rgba(255,255,255,0.16);
+
+    --text: #ffffff;
+    --text-2: rgba(255,255,255,0.75);
+    --text-3: rgba(255,255,255,0.5);
+    --text-4: rgba(255,255,255,0.3);
+
+    /* Accent: electric violet + cyan mix */
+    --accent: #7c5cff;
+    --accent-2: #3ad1ff;
+    --accent-glow: rgba(124,92,255,0.45);
+    --accent-soft: rgba(124,92,255,0.14);
+
+    --ok: #35d0a0;
+    --warn: #ffb454;
+    --err: #ff5566;
+
+    --focus: #fff;
+    --focus-sep: #06121a;     /* dark gap between a box edge and its focus ring */
+    --focus-ring: 0 0 0 4px rgba(var(--fg-rgb),0.9), 0 0 0 8px var(--accent);
+
+    --radius-s: 8px;
+    --radius-m: 14px;
+    --radius-l: 22px;
+    --radius-xl: 32px;
+
+    --shadow-soft: 0 20px 60px rgba(0,0,0,0.6);
+    --shadow-focus: 0 20px 60px rgba(124,92,255,0.5);
+
+    /* Sizing - designed for 1920x1080 */
+    --sidebar-w: 280px;
+    --sidebar-w-open: 340px;
+    --content-pad: 60px;
+
+    /* Single source of truth for the size of the small status glyphs — the
+     * favourite star and the lock/shield indicator — everywhere they appear
+     * (list rows, category items, live guide rows, channel cards, poster-card
+     * star). Kept as a raw px value; each rule multiplies by --ui-scale so the
+     * glyphs grow with Text Size. The ONE exception is the large centred lock
+     * badge on poster cards (.vod-card .lock-glyph), which sets its own size. */
+    --glyph-size: 30px;
+
+    --t-fast: 180ms cubic-bezier(.2,.8,.2,1);
+    --t-med: 320ms cubic-bezier(.2,.8,.2,1);
+    --t-slow: 520ms cubic-bezier(.2,.8,.2,1);
+}
+
+/* ===== Light theme (Settings > Theme) =====
+ * Same token names, light values. Accent / ok / warn / err stay as they are:
+ * they are saturated enough to read on both. */
+:root[data-theme="light"] {
+    color-scheme: light;
+    --fg-rgb: 18,21,29;
+    --bg-0: #e9ecf4;
+    --bg-1: #f2f4f9;
+    --bg-2: #ffffff;
+    --bg-3: #e7eaf2;
+    --bg-4: #d9deea;
+
+    --border: rgba(18,21,29,0.12);
+    --border-strong: rgba(18,21,29,0.24);
+
+    --text: #12151d;
+    --text-2: rgba(18,21,29,0.80);
+    --text-3: rgba(18,21,29,0.62);
+    --text-4: rgba(18,21,29,0.42);
+
+    --accent-glow: rgba(124,92,255,0.30);
+    --accent-soft: rgba(124,92,255,0.14);
+    --accent-text: #5a3dff;      /* accent used AS TEXT on a light surface */
+    --accent-2: #0b7fae;         /* the cyan is too pale to read on white */
+    --ok: #0d9a6f;
+    --warn: #b8730a;
+    --err: #d12a40;
+
+    --focus: #12151d;
+    --focus-sep: #ffffff;
+
+    --shadow-soft: 0 14px 40px rgba(30,40,70,0.18);
+    --shadow-focus: 0 14px 40px rgba(124,92,255,0.30);
+
+    --app-bg:
+        radial-gradient(1200px 800px at 12% -10%, rgba(124,92,255,0.10), transparent 60%),
+        radial-gradient(900px 700px at 110% 110%, rgba(58,209,255,0.10), transparent 55%),
+        linear-gradient(180deg, #f3f5fa 0%, #e6e9f2 100%);
+    --sidebar-bg: linear-gradient(180deg, rgba(255,255,255,0.96) 0%, rgba(240,243,249,0.98) 100%);
+    --hero-bg:
+        radial-gradient(900px 500px at 100% 0%, rgba(58,209,255,0.14), transparent 55%),
+        linear-gradient(120deg, #ffffff 0%, #eef1f8 55%, #e4e8f3 100%);
+    --poster-bg: linear-gradient(160deg, #dfe4ef 0%, #cdd4e4 100%);
+    --btn-bg: linear-gradient(180deg, #ffffff 0%, #e8ebf3 100%);
+    --field-focus-bg: #ffffff;
+    --scrim: rgba(24,30,46,0.55);
+}
+
+/* The player and the Live TV preview frame (video) are always dark, whatever the
+ * app theme: put the dark tokens back for everything inside them so overlay text, buttons and panels stay readable on
+ * video. (Popups that open from the player live in the global modal layer and
+ * follow the app theme; they have their own opaque panel.) */
+:root[data-theme="light"] #player,
+:root[data-theme="light"] #splash,
+:root[data-theme="light"] .side-logo,
+:root[data-theme="light"] .live-top-mini-frame {
+    --fg-rgb: 255,255,255;
+    --bg-0: #06070a;
+    --bg-1: #0b0d13;
+    --bg-2: #12151d;
+    --bg-3: #1a1f2b;
+    --bg-4: #232a38;
+    --border: rgba(255,255,255,0.08);
+    --border-strong: rgba(255,255,255,0.16);
+    --text: #ffffff;
+    --text-2: rgba(255,255,255,0.75);
+    --text-3: rgba(255,255,255,0.5);
+    --text-4: rgba(255,255,255,0.3);
+    --accent-2: #3ad1ff;
+    --focus: #fff;
+    --focus-sep: #06121a;
+    --btn-bg: linear-gradient(180deg, #2a2f3f 0%, #181c26 100%);
+    --scrim: rgba(4,5,8,0.85);
+}
+
+/* Tapping the Continue Watching
+ * remove glyph on mobile briefly shows a shadow for a frame or two. No
+ * explicit :active/box-shadow rule anywhere in this codebase ever set that
+ * — it's the browser's own DEFAULT WebKit tap-highlight overlay (a
+ * semi-transparent gray/black flash on touch), which nothing here has ever
+ * suppressed. Every .focusable element is a custom-styled control with its
+ * own focus/active visual treatment already, so the browser's default
+ * highlight is pure unwanted noise everywhere it appears, not just on this
+ * one glyph — fixed globally rather than only on .cw-remove-glyph, since
+ * the same latent artifact plausibly exists on every other touch target in
+ * the app, just less noticeable against a larger or differently-coloured
+ * control. Purely a highlight suppression — no layout/visual side effects. */
+.focusable {
+    -webkit-tap-highlight-color: transparent;
+    /* body is cursor:none (reset.css), so an element with no cursor of its own
+     * shows NO pointer under a Magic Remote / mouse. <button> gets pointer from
+     * the reset, but <div>/<label> controls only had it if their own class set
+     * it — a sweep found the on-screen keyboard keys, Live TV guide rows and
+     * player mini-list rows missing it. One rule covers every focusable
+     * regardless of tag. Still hidden while the D-pad drives:
+     * body.mouse-hidden * (player.css) is more specific and wins. Per-class
+     * rules in later files (e.g. cursor:default on disabled controls) also win
+     * on source order. */
+    cursor: pointer;
+}
+/* Exceptions to the blanket pointer. */
+input.focusable,
+textarea.focusable {
+    cursor: text;
+}
+.focusable[disabled],
+.focusable.disabled {
+    cursor: default;
+}
+/* Focusable but not clickable (a scrolling info panel): keep the previous
+ * behaviour (inherits body's cursor:none) until its pointer/click behaviour is
+ * decided separately. */
+.panel-info.focusable {
+    cursor: inherit;
+}
+
+/* App root */
+#app {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    background: var(--app-bg);
+    /* transform applied via JS only on 4K screens */
+}
+
+/* Grid overlay removed — visible on TV panels */
+
+/* Screens */
+.screen {
+    position: absolute;
+    top: 0; right: 0; bottom: 0; left: 0;
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity var(--t-med);
+    z-index: 1;
+}
+.screen.active {
+    opacity: 1;
+    visibility: visible;
+    z-index: 10;
+}
+
+.hidden { display: none !important; }
+
+/* Utility */
+.mono { font-family: 'Courier New', monospace; letter-spacing: 1px; }
+.accent { color: var(--accent-2); }
+
+/* Touch devices only (html[data-touch] is set at boot): a fast second tap must
+ * not zoom the page in. manipulation keeps panning and pinch-zoom and drops
+ * double-tap zoom (and the tap delay). TVs never get data-touch, so this is inert
+ * there. Applies to every element so inner scroll containers do not re-allow it. */
+html[data-touch],
+html[data-touch] * {
+    touch-action: manipulation;
+}

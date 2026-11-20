@@ -1,0 +1,16 @@
+/* tv-scale.css — the Text Size -> --ui-scale mapping, loaded LAST so it wins.
+ *
+ * This file is intentionally tiny: it ONLY defines the --ui-scale custom property
+ * per Text Size setting. Every rule that scales with Text Size does so by using
+ * calc(... * var(--ui-scale)) in its own file (screens.css / components.css) or,
+ * for the 720 layout, via tools/gen-tv720.py -> tv-720.css. Keeping the mapping
+ * here and the usage there means there is one source of truth for the scale
+ * factors and no !important width/height overrides hiding in this file.
+ *
+ * Values chosen so the UI still fits 1920x1080 without overflow at every size.
+ */
+:root { --ui-scale: 1; }
+html[data-text-size="xsmall"] { --ui-scale: 0.80; }
+html[data-text-size="small"]  { --ui-scale: 0.90; }
+html[data-text-size="large"]  { --ui-scale: 1.10; }
+html[data-text-size="xlarge"] { --ui-scale: 1.20; }

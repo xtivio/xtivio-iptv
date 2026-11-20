@@ -1,0 +1,24 @@
+{
+    "id": "com.xtivio.iptv",
+    "version": "1.0.12",
+    "vendor": "Xtivio",
+    "type": "web",
+    "main": "index.html",
+    "title": "Xtivio",
+    "appDescription": "IPTV player for M3U, Xtream Codes and Stalker / MAG playlists.",
+    "icon": "icon.png",
+    "largeIcon": "icon.png",
+    "iconColor": "#0a0d1a",
+    "splashBackground": "splash.png",
+    "uiRevision": "2",
+    "disableBackHistoryAPI": true,
+    "supportTouchMode": "none",
+    "requiredPermissions": [
+        "time.query",
+        "internet"
+    ],
+    "accessibility": {
+        "supportsAudioGuidance": false
+    },
+    "resolution": "1280x720"
+}

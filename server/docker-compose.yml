@@ -1,0 +1,77 @@
+services:
+    xtivio-pair:
+        build: .
+        image: xtivio-pair-server:latest
+        container_name: xtivio-pair
+        restart: unless-stopped
+        ports:
+            # Host:Container - change the host port if 9595 is taken
+            - "9595:9595"
+        environment:
+            NODE_ENV: production
+            HOST: "0.0.0.0"
+            PORT: "9595"
+            # Page security policy (CSP) on the pairing page: reports only by default. Set to "1" to ENFORCE once the
+            # browser console shows no violations on the pairing page and /auth/action.
+            # CSP_ENFORCE: "1"
+            # Path INSIDE THE CONTAINER where the Firebase Admin SDK service
+            # account JSON is mounted. Must match the volume target below.
+            FIREBASE_SERVICE_ACCOUNT_PATH: "/run/secrets/firebase-service-account.json"
+            # Firebase web config (JSON from the Firebase console: Project settings > Your apps > Web app).
+            # Single line. Alternative: a firebase-web-config.json file next to server.js.
+            # FIREBASE_WEB_CONFIG: '{"apiKey":"...","authDomain":"...","databaseURL":"...","projectId":"...","storageBucket":"...","messagingSenderId":"...","appId":"..."}'
+            # Extra browser origins allowed to call the API cross-origin (comma separated).
+            # CORS_ALLOWED_ORIGINS: "https://pair.example.com"
+        volumes:
+            # mount the Firebase service account JSON
+            # read-only into the container. Put the file at
+            # ./firebase-service-account.json on the HOST next to this
+            # docker-compose.yml (it's .gitignored). Without it, the
+            # server still starts and serves playlists, but sign-in /
+            # sign-up via the pairing page returns 503.
+            - ./firebase-service-account.json:/run/secrets/firebase-service-account.json:ro
+        deploy:
+            resources:
+                limits:
+                    cpus: "0.50"
+                    memory: 128M
+        # Hardening: users' portal details live only in this process's memory while a request
+        # or pairing is in flight. No core dumps (a crash must not write memory to disk), no
+        # swap (memswap = memory), no extra privileges.
+        ulimits:
+            core: 0
+        memswap_limit: 128M
+        cap_drop:
+            - ALL
+        security_opt:
+            - no-new-privileges:true
+        logging:
+            driver: json-file
+            options:
+                max-size: "10m"
+                max-file: "3"
+
+    # Optional: Caddy reverse proxy with automatic HTTPS via Let's Encrypt.
+    # Uncomment + set PAIR_DOMAIN to enable. Update PAIR_SERVER in
+    # assets/js/config.js to "https://${PAIR_DOMAIN}".
+    #
+    # caddy:
+    #   image: caddy:2-alpine
+    #   container_name: xtivio-caddy
+    #   restart: unless-stopped
+    #   ports:
+    #     - "80:80"
+    #     - "443:443"
+    #   environment:
+    #     PAIR_DOMAIN: "pair.yourdomain.com"
+    #   volumes:
+    #     - ./Caddyfile:/etc/caddy/Caddyfile:ro
+    #     - caddy_data:/data
+    #     - caddy_config:/config
+    #   depends_on:
+    #     - xtivio-pair
+
+
+# volumes:
+#   caddy_data:
+#   caddy_config:

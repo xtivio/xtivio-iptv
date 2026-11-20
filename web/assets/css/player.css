@@ -1,0 +1,708 @@
+/* player.css - fullscreen player, info overlay, mini channel list */
+
+#player {
+    background: #000;
+}
+
+.player-stage {
+    position: absolute;
+    top: 0; right: 0; bottom: 0; left: 0;
+    background: #000;
+    overflow: hidden;
+}
+
+/* ANDROID EXOPLAYER PUNCH-THROUGH (Option 3).
+ * When native ExoPlayer drives playback, the video is a SurfaceView composed
+ * BELOW the transparent WebView (setZOrderMediaOverlay). For it to show through,
+ * the app's normally-opaque layers (html/body, #app gradient, .player-stage)
+ * must be cleared while the exo engine is active. The web layer sets
+ * data-exo-active on <html> during exo playback. High-specificity selectors
+ * (html[data-exo-active] ...) win over the base rules without needing
+ * !important — normal WebView/<video> playback is untouched (attribute absent).
+ * The web overlays (info bar, controls, spinner, toasts) keep painting on top. */
+html[data-exo-active],
+html[data-exo-active] body,
+html[data-exo-active] #app,
+html[data-exo-active] #player,
+html[data-exo-active] .screen,
+html[data-exo-active] .player-stage,
+html[data-exo-active] .player-screen {
+    background-color: transparent;
+    background-image: none;
+}
+html[data-exo-active] #videoEl {
+    visibility: hidden;
+}
+
+/* Custom subtitle overlay — WebOS 6.5 won't paint script-added TextTracks, so we
+   render active cue text here ourselves, driven by the video timeupdate. */
+.sub-overlay {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: calc(64px * var(--ui-scale, 1));
+    text-align: center;
+    z-index: 30;
+    pointer-events: none;
+    padding: 0 6%;
+    /* Promote the overlay to its own GPU-composited layer. On WebOS 6.5 the video
+       decodes to a separate hardware plane that the browser composites; a plain
+       z-index DOM element is not guaranteed its own layer, so the cue text updates
+       in the DOM but never paints over the hardware video (the symptom: cue state
+       transitions fire in the log but nothing shows on screen). Forcing a 3D layer
+       puts the overlay on a compositor plane above the video so it actually paints. */
+    transform: translateZ(0);
+    -webkit-transform: translateZ(0);
+    will-change: transform, contents;
+    -webkit-backface-visibility: hidden;
+    backface-visibility: hidden;
+}
+.sub-overlay .sub-cue-line {
+    display: inline-block;
+    color: #fff;
+    font-size: calc(34px * var(--ui-scale, 1));
+    line-height: 1.25;
+    font-weight: 600;
+    text-shadow: 0 2px 4px rgba(0,0,0,0.95), 0 0 6px rgba(0,0,0,0.9);
+    background: rgba(0,0,0,0.35);
+    padding: calc(2px * var(--ui-scale, 1)) calc(10px * var(--ui-scale, 1));
+    border-radius: 4px;
+    white-space: pre-wrap;
+}
+.sub-overlay.hidden { display: none; }
+.player-stage video {
+    /* NOTE: position, background, margin and padding are NOT set here — they are
+     * set with !important in the "JS-driven fullscreen scaling" block further
+     * down, which has to win against UA stylesheets on older TV engines. They
+     * used to be declared in BOTH places with identical values, which just made
+     * it unclear which one was live. Everything below is set only here. */
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+}
+
+.player-loading {
+    position: absolute;
+    top: 0; right: 0; bottom: 0; left: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    background: radial-gradient(circle at center, rgba(20,24,35,0.6), rgba(0,0,0,0.95));
+    z-index: 5;
+}
+.player-loading.zap { background: transparent; }
+.player-loading.zap .ploading-text { display: none; }
+.ploading-text {
+    color: var(--text-2);
+    letter-spacing: 3px;
+    font-size: calc(26px * var(--ui-scale));
+    text-transform: uppercase;
+}
+
+.player-error {
+    position: absolute;
+    top: 0; right: 0; bottom: 0; left: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0,0,0,0.9);
+    z-index: 5;
+    padding: 40px;
+    text-align: center;
+}
+.perr-ic {
+    width: 80px;
+    height: 80px;
+    border-radius: 50%;
+    background: rgba(255,85,102,0.15);
+    border: 2px solid var(--err);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 40px;
+    font-weight: 700;
+    color: var(--err);
+    margin-bottom: 8px;
+}
+.perr-text {
+    font-size: calc(26px * var(--ui-scale));
+    font-weight: 700;
+    color: #fff;
+}
+.perr-sub {
+    font-size: calc(26px * var(--ui-scale));
+    color: var(--text-3);
+    max-width: 600px;
+    line-height: 1.4;
+}
+.perr-code {
+    font-size: calc(26px * var(--ui-scale));
+    color: var(--text-3);
+    opacity: 0.75;
+    margin-top: 6px;
+}
+
+/* ===== Info overlay ===== */
+.info-overlay {
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 0;
+    bottom: 0;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+    opacity: 0;
+    transition: opacity var(--t-med);
+    z-index: 10;
+    pointer-events: none;
+}
+.info-overlay.show {
+    opacity: 1;
+}
+
+/* Transport controls — absolutely centered on screen */
+.info-transport {
+    position: absolute;
+    top: 45%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    display: flex;
+    align-items: center;
+    z-index: 11;
+    /* This was unconditionally pointer-events:auto (re-enabled for
+     * Magic Remote pointer clicks — the overlay parent sets pointer-events:
+     * none, so control rows must opt back in), regardless of whether the
+     * overlay was actually shown. On mobile that meant these controls were
+     * still genuinely clickable/draggable while completely invisible: a
+     * swipe-up gesture meant to reveal the overlay could land on the (hidden
+     * but still interactive) transport/seekbar first and get treated as a
+     * seek instead. Scoped to .show now — this can't lose real Magic Remote
+     * functionality either, since a click on something the viewer can't see
+     * (opacity:0) was never an intentional interaction to begin with. */
+    pointer-events: none;
+}
+.info-overlay.show .info-transport {
+    pointer-events: auto !important;
+}
+.info-transport > * + * { margin-left: 40px; }
+
+/* Prev/next-channel buttons — positioned independently, near the screen
+ * edges, NOT as part of the centered rew/play/fwd group above (per
+ * request: "more to each side... not centred with the other player
+ * controls"). Same absolute-position + top:45% approach as .info-transport,
+ * just anchored to left/right instead of center, and the same .show-gated
+ * pointer-events reasoning (see .info-transport's own comment above) —
+ * invisible but still interactive would let a swipe/tap land on a hidden
+ * button instead of doing what the visible UI suggests. Three classes on
+ * the override selector (.info-overlay.show .transport-edge-btn) beat the
+ * base rule's one (.transport-edge-btn) on specificity alone — no
+ * !important needed here, unlike .info-transport's own version of this
+ * pattern above (which is fighting something else, not touched here). */
+.transport-edge-btn {
+    position: absolute;
+    top: 45%;
+    transform: translateY(-50%);
+    z-index: 11;
+    pointer-events: none;
+}
+.info-overlay.show .transport-edge-btn {
+    pointer-events: auto;
+}
+.transport-edge-left { left: calc(50px * var(--ui-scale, 1)); }
+.transport-edge-right { right: calc(50px * var(--ui-scale, 1)); }
+
+.transport-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    /* Scales with --ui-scale — the same global custom property every other
+     * sized element in the app uses (Text Size settings, and the 720p
+     * profile, both just redefine --ui-scale at the root; nothing here needs
+     * to know about either). Was a hard 60/80px (see .transport-play below),
+     * ignoring Text Size entirely — the one part of this overlay that
+     * didn't, everything else here (.info-action et al) already does. */
+    width: calc(60px * var(--ui-scale, 1));
+    height: calc(60px * var(--ui-scale, 1));
+    border-radius: 50%;
+    background: rgba(0,0,0,0.5);
+    border: 2px solid rgba(255,255,255,0.3);
+    color: rgba(255,255,255,0.9);
+    transition: background var(--t-fast), border-color var(--t-fast);
+    padding: 0;
+    box-sizing: border-box;
+    line-height: 0;
+    cursor: pointer;
+}
+.transport-btn svg {
+    display: block;
+    margin: auto;
+    /* Matches .nav-ic svg / .live-top-mini-actions .btn svg's convention
+     * (width/height scaled here in CSS, not hardcoded on the <svg> in HTML —
+     * see index.html, the width="40" height="40" attributes there are gone). */
+    width: calc(40px * var(--ui-scale, 1));
+    height: calc(40px * var(--ui-scale, 1));
+}
+.transport-btn.focused {
+    background: rgba(255,255,255,0.2);
+    border-color: #fff;
+    color: #fff;
+}
+.transport-play {
+    width: calc(80px * var(--ui-scale, 1));
+    height: calc(80px * var(--ui-scale, 1));
+}
+
+/* Bottom bar */
+.info-bottom {
+    padding: 0 50px 30px;
+    background: linear-gradient(180deg, transparent 0%, rgba(0,0,0,0.92) 100%);
+    padding-top: 80px;
+    /* See .info-transport's comment above — same bug, same fix: this
+     * includes the seek/scrub bar, so being clickable while hidden was also
+     * exactly why a swipe-up-to-reveal gesture could land on it and trigger
+     * a scrub instead. */
+    pointer-events: none;
+}
+.info-overlay.show .info-bottom {
+    pointer-events: auto !important;
+}
+
+.info-top {
+    display: flex;
+    align-items: center;
+    margin-bottom: 10px;
+    padding-top: 80px;
+}
+.info-top > * + * { margin-left: 16px; }
+.info-num {
+    font-family: 'DisplayTV';
+    font-size: calc(76px * var(--ui-scale, 1));
+    font-weight: 700;
+    letter-spacing: -2px;
+    background: linear-gradient(135deg, #fff 0%, var(--accent-2) 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    min-width: 90px;
+}
+.info-main { flex: 1; min-width: 0; }
+.info-name {
+    font-size: calc(40px * var(--ui-scale, 1));
+    font-weight: 700;
+    margin-bottom: 2px;
+    text-shadow: 0 2px 12px rgba(0,0,0,0.7);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.info-meta {
+    font-size: calc(26px * var(--ui-scale));
+    color: var(--text-2);
+    letter-spacing: 0.5px;
+    font-weight: 600;
+}
+.info-meta .sep { margin: 0 8px; color: var(--text-4); }
+.info-time {
+    font-family: 'DisplayTV';
+    font-size: calc(34px * var(--ui-scale, 1));
+    font-weight: 700;
+    color: var(--text);
+    letter-spacing: 1px;
+}
+
+/* EPG block (Live TV) */
+.info-epg {
+    display: flex;
+    margin-bottom: 14px;
+}
+.info-epg > * + * { margin-left: 12px; }
+.info-now, .info-next {
+    flex: 1;
+    background: rgba(255,255,255,0.06);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-m);
+    padding: 12px 18px;
+}
+.info-now { border-color: rgba(58,209,255,0.3); background: rgba(58,209,255,0.08); }
+.iepg-lbl {
+    font-size: calc(26px * var(--ui-scale));
+    letter-spacing: calc(2px * var(--ui-scale));
+    font-weight: 700;
+    color: var(--accent-2);
+    margin-bottom: 4px;
+}
+.info-next .iepg-lbl { color: var(--text-3); }
+.iepg-title {
+    font-size: calc(26px * var(--ui-scale));
+    font-weight: 700;
+    color: #fff;
+    margin-bottom: 4px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.iepg-time {
+    font-size: calc(26px * var(--ui-scale));
+    color: var(--text-3);
+    letter-spacing: 1px;
+}
+.iepg-prog {
+    margin-top: 8px;
+    height: 4px;
+    background: rgba(255,255,255,0.08);
+    border-radius: 2px;
+    overflow: hidden;
+}
+.iepg-prog-fill {
+    height: 100%;
+    width: 0%;
+    background: var(--accent);
+    transition: width 1s linear;
+}
+
+/* VOD seekbar */
+.info-seekbar {
+    margin-bottom: 14px;
+}
+.seek-times {
+    display: flex;
+    justify-content: flex-end;
+    font-size: calc(26px * var(--ui-scale));
+    color: #fff;
+    margin-bottom: 6px;
+    font-weight: 700;
+    letter-spacing: 0;
+    font-family: 'DisplayTV', Arial, sans-serif;
+}
+.seek-elapsed,
+.seek-total { color: #fff; font-weight: 700; }
+.seek-elapsed::after {
+    content: '/';
+    display: inline-block;
+    padding: 0 14px;
+    color: #fff;
+    font-family: Arial, Helvetica, sans-serif;
+    font-weight: 700;
+}
+.seek-track {
+    height: 8px;
+    background: rgba(255,255,255,0.15);
+    border-radius: 4px;
+    position: relative;
+    overflow: visible;
+    cursor: pointer;
+}
+.seek-track.focused {
+    height: 12px;
+    background: rgba(255,255,255,0.25);
+    /* Subtle accent border to match the app's focus language (.btn.focused uses a
+     * soft accent border, no heavy glow). */
+    box-shadow: 0 0 0 1px rgba(124,92,255,0.4);
+}
+.seek-track.focused .seek-fill {
+    background: var(--accent-2);
+}
+.seek-track.focused .seek-thumb {
+    width: 20px;
+    height: 20px;
+    margin-top: -10px;
+    background: var(--accent-2);
+}
+.seek-buf {
+    position: absolute;
+    left: 0;
+    top: 0;
+    height: 100%;
+    width: 0%;
+    background: rgba(255,255,255,0.4);
+    border-radius: 4px;
+    transition: width 0.5s linear;
+}
+.seek-fill {
+    position: relative;
+    height: 100%;
+    background: var(--accent);
+    border-radius: 4px;
+    width: 0%;
+    transition: width 0.3s linear;
+}
+.seek-thumb {
+    position: absolute;
+    top: 50%;
+    margin-top: -8px;
+    left: 0%;
+    width: 16px;
+    height: 16px;
+    background: #fff;
+    border-radius: 50%;
+    box-shadow: 0 0 8px rgba(0,0,0,0.5);
+    transition: left 0.3s linear;
+}
+
+/* Action buttons — horizontal row like Stremio */
+.info-actions {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-wrap: wrap;
+    /* See .info-transport's comment above — same bug (clickable while
+     * invisible), same fix. */
+    pointer-events: none;
+}
+.info-overlay.show .info-actions {
+    pointer-events: auto !important;
+}
+.info-actions > * { margin: 4px 8px; }
+.info-action {
+    display: flex;
+    align-items: center;
+    position: relative;
+    /* Padding scales with the font so the button BOX grows with its label
+     * instead of getting proportionally tight at larger Text Sizes. No
+     * height/width is set here deliberately: the box is content-sized, so it
+     * follows the text. .info-actions wraps, so wide labels reflow rather than
+     * overflow. This cannot affect the video — .info-overlay is
+     * position:absolute (pointer-events:none) layered OVER the <video>, which
+     * is a sibling in .player-stage, so the overlay is out of normal flow. */
+    padding: calc(8px * var(--ui-scale, 1)) calc(14px * var(--ui-scale, 1));
+    border-radius: 6px;
+    background: transparent;
+    border: none;
+    color: rgba(255,255,255,0.8);
+    /* Was a hard 26px here AND a hard 26px !important in the
+     * @media (min-width: 1920px) block in screens.css, so these player OSD
+     * buttons (subtitles / audio track) ignored the Text Size setting at every
+     * viewport width — at xlarge everything around them grew and they stayed
+     * put. Scaled here, in the button's own stylesheet; the media-block line is
+     * deleted. */
+    font-size: calc(26px * var(--ui-scale, 1));
+    font-weight: 600;
+    letter-spacing: 0.3px;
+    transition: color var(--t-fast), background var(--t-fast);
+    white-space: nowrap;
+    cursor: pointer;
+}
+/* Enlarge the pointer hit area vertically to meet LG's 75x75 / 50x50 clickable
+ * guidance. These buttons are icon + label, so their WIDTH is already well past
+ * 75px; only the height (about 42px content-sized) falls short. About 17px of
+ * expansion each side (scaled) brings it to ~76px. Same transparent-child-pseudo
+ * pattern as the mini-player actions and cat-manager order arrows: the press
+ * counts as a press on the button while its own offsetHeight, the D-pad focus
+ * engine, and the wrapping row layout are unchanged. The row has margin:4px 8px
+ * between items and wraps, so the expanded zones do not collide. Left/right kept
+ * at 0 so neighbouring buttons' zones never overlap horizontally. */
+.info-action::before {
+    content: "";
+    position: absolute;
+    top: calc(-17px * var(--ui-scale, 1));
+    bottom: calc(-17px * var(--ui-scale, 1));
+    left: 0;
+    right: 0;
+    background: transparent;
+}
+.info-action svg {
+    /* Only margin-right scaled here — the icon's own size didn't,
+     * unlike .nav-ic svg / .live-top-mini-actions .btn svg / .cat-mgr-
+     * order-btn svg, which all scale width/height with --ui-scale the same
+     * way. Every icon in this row (Subtitles/Audio/Favorite/Scale/Speed/
+     * Channels/Open Externally) was fixed at 22px regardless of Text Size,
+     * while its own label text right next to it did scale — the two visibly
+     * drifted apart at anything other than Normal. Matches the icon's
+     * previous fixed HTML width/height (22, see index.html — those
+     * attributes are gone now, scaling is CSS-only here, same convention as
+     * the icons named above). */
+    width: calc(22px * var(--ui-scale, 1));
+    height: calc(22px * var(--ui-scale, 1));
+    /* Scales with the label so the icon doesn't crowd the text at large sizes. */
+    margin-right: calc(8px * var(--ui-scale, 1));
+    flex-shrink: 0;
+}
+.info-action span { line-height: 1; }
+/* .info-action sets display:flex and loads AFTER components.css, so at equal
+ * specificity it silently beat the plain .init-hidden rule and every button that
+ * relies on the class alone (Open Externally) showed on every platform. Two
+ * classes win; inline style.display reveals (Speed, Channels) still win over this. */
+.info-action.init-hidden { display: none; }
+.info-action.focused {
+    color: #fff;
+    background: rgba(255,255,255,0.12);
+}
+
+/* ===== Mini channel list ===== */
+.mini-channels {
+    position: absolute;
+    top: 0;
+    right: 0;
+    /* Scale with --ui-scale. Base is 580px (1080: 580px ~30% of 1920, still ~70%
+     * video); widened from 520. The left gradient fade was removed in favour of a
+     * solid dark panel (per user request), so the left padding no longer needs to
+     * reserve a fade zone and was trimmed 50 to 30 to hand that space to the name.
+     * The 720 canvas inherits this base width (no separate override). Padding
+     * scales too so Text Size keeps proportions. */
+    width: calc(580px * var(--ui-scale, 1));
+    height: 100%;
+    background: rgba(6,8,12,0.95);
+    padding: calc(40px * var(--ui-scale, 1)) calc(30px * var(--ui-scale, 1)) calc(40px * var(--ui-scale, 1)) calc(30px * var(--ui-scale, 1));
+    transform: translateX(100%);
+    transition: transform var(--t-med);
+    z-index: 15;
+    display: flex;
+    flex-direction: column;
+}
+.mini-channels.show { transform: translateX(0); }
+
+.mini-head {
+    font-family: 'DisplayTV';
+    font-size: calc(26px * var(--ui-scale, 1));
+    font-weight: 700;
+    margin-bottom: 20px;
+    padding-bottom: 14px;
+    border-bottom: 1px solid var(--border);
+    letter-spacing: -0.5px;
+}
+.mini-list {
+    flex: 1;
+    overflow-y: auto;
+    padding: 8px 10px 80px 8px;
+}
+.mini-ch {
+    display: flex;
+    align-items: center;
+    padding: 12px 14px;
+    border-radius: var(--radius-m);
+    margin-bottom: 4px;
+    transition: all var(--t-fast);
+    background: transparent;
+    overflow: hidden;
+    box-sizing: border-box;
+    max-width: 100%;
+    position: relative;
+}
+.mini-ch.focused {
+    background: var(--accent-soft);
+    border-color: rgba(124,92,255,0.5);
+}
+.mini-ch.playing {
+    font-weight: 700;
+}
+.mini-ch.playing::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 50%;
+    margin-top: -14px;
+    width: 3px;
+    height: 28px;
+    background: var(--accent-2);
+    border-radius: 0 3px 3px 0;
+}
+.mini-ch-num {
+    font-size: calc(26px * var(--ui-scale));
+    font-weight: 700;
+    color: var(--text-3);
+    width: 56px;
+    margin-right: 16px;
+    text-align: center;
+    flex-shrink: 0;
+}
+.mini-ch.playing .mini-ch-num { color: var(--accent-2); }
+.mini-ch-info { flex: 1; overflow: hidden; }
+.mini-ch-name {
+    font-size: calc(26px * var(--ui-scale));
+    font-weight: 600;
+    color: var(--text);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.mini-ch-prog {
+    font-size: calc(26px * var(--ui-scale));
+    color: var(--text-3);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    margin-top: 2px;
+}
+
+/* Mini channel list paging */
+.mini-page-info {
+    text-align: center;
+    color: var(--text-4);
+    font-size: calc(26px * var(--ui-scale));
+    padding: 8px 16px;
+    letter-spacing: 0.5px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.mini-page-btn {
+    text-align: center;
+    justify-content: center;
+    color: var(--accent-2);
+    font-size: calc(26px * var(--ui-scale));
+    font-weight: 600;
+    border: 1px dashed rgba(58,209,255,0.3);
+    border-radius: 8px;
+}
+.mini-page-btn.focused {
+    background: rgba(58,209,255,0.15);
+    border-color: var(--accent-2);
+    color: #fff;
+}
+
+
+/* Fullscreen loading spacing */
+.player-loading .spinner + .ploading-text,
+.player-loading .ploading-text {
+    margin-top: 18px;
+}
+
+/* JS-driven fullscreen scaling for older TV engines.
+   The JS (applyVideoScale) sets width/height/left/top inline per mode;
+   this rule only locks the layout baseline (!important guards against UA
+   or other stylesheets overriding it on older TV engines). The base
+   .player-stage video selector already matches every scale-* variant
+   (contain/cover/fill-h/fill-v/four-three), so per-class selectors here
+   would be redundant. Do NOT force width/height here. */
+.player-stage video {
+    position: absolute;
+    margin: 0;
+    padding: 0;
+    right: auto;
+    bottom: auto;
+    max-width: none;
+    max-height: none;
+    background: #000;
+}
+
+/* Hide the pointer entirely while the user is driving
+ * with the D-pad (see focus.js — body.mouse-hidden is toggled on
+ * keydown vs real mousemove). Stops a parked Magic Remote cursor from
+ * firing synthetic mouseover events and stealing focus when the DOM
+ * scrolls beneath it. */
+body.mouse-hidden,
+body.mouse-hidden * {
+    cursor: none;
+}
+
+/* Clock in the corner of the picture (Settings > Clock on Player > Always). Steps aside while the info overlay is up. */
+.player-clock {
+    position: absolute;
+    top: calc(28px * var(--ui-scale, 1));
+    right: calc(36px * var(--ui-scale, 1));
+    padding: calc(4px * var(--ui-scale, 1)) calc(14px * var(--ui-scale, 1));
+    border-radius: calc(10px * var(--ui-scale, 1));
+    background: rgba(0, 0, 0, 0.45);
+    color: #fff;
+    font-family: 'DisplayTV';
+    font-size: calc(30px * var(--ui-scale, 1));
+    font-weight: 700;
+    letter-spacing: 1px;
+    z-index: 3;
+    pointer-events: none;
+}

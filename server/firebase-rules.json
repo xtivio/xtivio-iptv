@@ -1,0 +1,87 @@
+{
+  "rules": {
+    ".read": false,
+    ".write": false,
+
+    "config": {
+      ".read": true,
+      ".write": false
+    },
+
+    "users": {
+      "$uid": {
+        ".read":  "auth != null && auth.uid == $uid",
+        ".write": "auth != null && auth.uid == $uid",
+
+        "data": {
+          "lastUpdated": {
+            ".validate": "newData.isNumber() && newData.val() > 0 && (!data.exists() || newData.val() >= data.val())"
+          },
+
+          "favorites":         { ".validate": true },
+
+          "favTombstones":     { ".validate": true },
+          "playlists": {
+            "$i": {
+              ".validate": "(!newData.hasChild('user') || (newData.child('user').isString() && (newData.child('user').val() == '' || newData.child('user').val().beginsWith('zk1:')))) && (!newData.hasChild('pass') || (newData.child('pass').isString() && (newData.child('pass').val() == '' || newData.child('pass').val().beginsWith('zk1:')))) && (!newData.hasChild('url') || (newData.child('url').isString() && (newData.child('url').val() == '' || newData.child('url').val().beginsWith('zk1:')))) && (!newData.hasChild('epgUrl') || (newData.child('epgUrl').isString() && (newData.child('epgUrl').val() == '' || newData.child('epgUrl').val().beginsWith('zk1:')))) && (!newData.hasChild('mac') || (newData.child('mac').isString() && (newData.child('mac').val() == '' || newData.child('mac').val().beginsWith('zk1:')))) && (!newData.hasChild('serial') || (newData.child('serial').isString() && (newData.child('serial').val() == '' || newData.child('serial').val().beginsWith('zk1:')))) && (!newData.hasChild('deviceId') || (newData.child('deviceId').isString() && (newData.child('deviceId').val() == '' || newData.child('deviceId').val().beginsWith('zk1:')))) && (!newData.hasChild('content') || (newData.child('content').isString() && (newData.child('content').val() == '' || newData.child('content').val().beginsWith('zk1:')))) && !newData.hasChild('password')"
+            }
+          },
+
+          "playlistTombstones": { ".validate": true },
+          "settings": {
+            ".validate": true,
+            "externalEpgUrl": {
+              ".validate": "newData.val() == null || (newData.isString() && (newData.val().beginsWith('zk1:') || (!newData.val().contains('username=') && !newData.val().contains('password='))))"
+            },
+            "externalEpgUrls": {
+              "$i": {
+                ".validate": "newData.val() == null || (newData.isString() && (newData.val().beginsWith('zk1:') || (!newData.val().contains('username=') && !newData.val().contains('password='))))"
+              }
+            }
+          },
+          "vodHistory":        { ".validate": true },
+          "recentChannels":    { ".validate": true },
+          "hiddenCats":        { ".validate": true },
+          "parentalLocks":     { ".validate": true },
+          "parentalItemLocks": { ".validate": true },
+          "customCatOrder":    { ".validate": true },
+
+          "activePlaylist": {
+            ".validate": "newData.val() == null || (newData.isString() && newData.val().length <= 256)"
+          },
+
+          "preferredSubLang": {
+            ".validate": "newData.val() == null || (newData.isString() && newData.val().length <= 16)"
+          },
+
+          "syncMode": {
+            ".validate": "newData.val() == null || (newData.isString() && (newData.val() == 'shell' || newData.val() == 'zk'))"
+          },
+
+          "zkSalt": {
+            ".validate": "newData.val() == null || (newData.isString() && newData.val().length <= 256)"
+          },
+          "zkVerifier": {
+            ".validate": "newData.val() == null || (newData.isString() && newData.val().length <= 1024)"
+          },
+
+          "parental": {
+            ".validate": "newData.val() == null || !newData.hasChild('pin')"
+          },
+
+          "contentTypes": {
+            ".validate": "newData.hasChildren()",
+            "live":   { ".validate": "newData.isBoolean()" },
+            "movies": { ".validate": "newData.isBoolean()" },
+            "series": { ".validate": "newData.isBoolean()" },
+            "$other": { ".validate": "false" }
+          },
+
+          "$other": { ".validate": "false" }
+        },
+
+        "$other": { ".validate": "false" }
+      }
+    }
+  }
+}

@@ -1,0 +1,16 @@
+# Dependencies are installed inside the image, never copied from the host.
+node_modules
+npm-debug.log
+
+# Docs and local-only files — not needed at runtime.
+*.md
+smoke
+firebase-rules.json
+docker-compose.yml
+.dockerignore
+.git
+.gitignore
+.env
+.DS_Store
+
+firebase-web-config.json

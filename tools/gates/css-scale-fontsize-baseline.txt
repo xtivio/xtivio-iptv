@@ -1,0 +1,10 @@
+# css-scale-fontsize-check baseline
+# Selectors whose font-size is still declared in BOTH a base stylesheet
+# and tv-scale.css with the SAME value. Known migration backlog from the
+# 467 cleanup - NOT permission to add more. The gate fails on anything
+# not listed here, and fails on entries here that are already fixed, so
+# this file can only shrink.
+#
+# To migrate one: put calc(Npx * var(--ui-scale, 1)) in the base rule,
+# delete the tv-scale line, delete the line here, verify on device.
+

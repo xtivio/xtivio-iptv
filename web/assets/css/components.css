@@ -1,0 +1,880 @@
+/* components.css - reusable building blocks */
+
+/* ===== Buttons ===== */
+.btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    /* min-height (not height): the button is single-line (white-space:nowrap), so
+     * this matches a fixed height when text fits, but lets the box grow instead of
+     * clipping / bottom-aligning if the font renders taller than 56px on some
+     * platforms (e.g. webOS 6.5 metrics, tall scripts). Buttons in a row stay
+     * uniform because their single-line text resolves to the same height. */
+    min-height: calc(56px * var(--ui-scale));
+    padding: 0 calc(26px * var(--ui-scale));
+    border-radius: var(--radius-m);
+    background: var(--btn-bg);
+    border: 1px solid var(--border-strong);
+    color: var(--text);
+    font-size: calc(26px * var(--ui-scale));
+    font-weight: 600;
+    letter-spacing: 0.2px;
+    white-space: nowrap;
+    transition: background var(--t-fast), border-color var(--t-fast), box-shadow var(--t-fast);
+    outline: none;
+}
+.btn.danger {
+    background: linear-gradient(180deg, rgba(255,85,102,0.2) 0%, rgba(255,85,102,0.08) 100%);
+    border-color: rgba(255,85,102,0.5);
+    color: #ffbcc3;
+    font-size: calc(26px * var(--ui-scale));
+}
+.btn.primary {
+    background: linear-gradient(180deg, var(--accent) 0%, #5a3dff 100%);
+    border-color: transparent;
+    color: #fff;
+}
+.btn.focused {
+    /* Match the side-menu focus treatment (.nav-btn.focused): a soft accent wash
+       with a subtle accent border, rather than a bold solid purple fill. No drop
+       shadow (the nav focus has none) and no scale — the accent wash + border is
+       the focus indicator on its own; a scale transform also caused a repaint on
+       webOS 6.5 and shifted layout by ~1px against neighbours. */
+    background: var(--accent-soft);
+    border-color: var(--accent-2);
+    color: var(--text);
+    /* Thin version of the card focus ring (.ch-card/.pl-card use 3px + a 40px
+     * glow): a 2px --accent-2 ring plus a small 14px halo, so the focused
+     * button reads from across the room. Kept deliberately light — buttons are
+     * small and sit in tight rows. Not transitioned-heavy: the ring is tiny, so
+     * the .btn transition on box-shadow is cheap here (unlike full-width cards). */
+    box-shadow: 0 0 0 2px var(--accent-2), 0 0 14px rgba(58,209,255,0.35);
+}
+.btn.danger.focused {
+    /* Red fill is the focus indicator. No box-shadow glow — it read as a heavy
+       halo on the Sources screen's "Delete All" button against the page
+       background, and .btn.focused (non-danger) already uses no drop shadow, so
+       this keeps every focused button consistent. */
+    background: linear-gradient(180deg, var(--err) 0%, #cc3344 100%);
+    /* Ring only, no blur halo (the halo is what read as heavy here): keeps
+     * the focus outline the other buttons have without the glow. */
+    box-shadow: 0 0 0 2px var(--accent-2);
+}
+
+/* ===== Chips ===== */
+.chip {
+    display: inline-flex;
+    align-items: center;
+    height: calc(46px * var(--ui-scale));
+    padding: 0 calc(16px * var(--ui-scale));
+    border-radius: 100px;
+    background: rgba(var(--fg-rgb),0.06);
+    border: 1px solid var(--border);
+    font-size: calc(26px * var(--ui-scale));
+    color: var(--text-2);
+    font-weight: 600;
+}
+.chip.accent {
+    background: var(--accent-soft);
+    border-color: rgba(124,92,255,0.4);
+    color: #cfc3ff;
+}
+/* Active-indexing state for the totals chip: a slow opacity breathe so the chip
+ * reads as "working" even when the count is momentarily static (between the movies
+ * and series index passes). Removed when App.isCatalogIndexing() goes false. Uses a
+ * plain @keyframes opacity animation, which Chromium 53 (webOS 6.5) supports. */
+.chip.chip-indexing {
+    animation: chipIndexPulse 1.4s ease-in-out infinite;
+}
+@keyframes chipIndexPulse {
+    0%   { opacity: 1; }
+    50%  { opacity: 0.5; }
+    100% { opacity: 1; }
+}
+
+/* ===== Inputs / fields ===== */
+.field-label {
+    display: block;
+    font-size: calc(26px * var(--ui-scale));
+    letter-spacing: 1.2px;
+    color: var(--text-3);
+    text-transform: uppercase;
+    margin: 18px 0 8px;
+    font-weight: 600;
+}
+.field {
+    display: block;
+    width: 100%;
+    height: calc(60px * var(--ui-scale));
+    padding: 0 20px;
+    background: var(--bg-2);
+    border: 2px solid var(--border);
+    border-radius: var(--radius-m);
+    color: var(--text);
+    font-size: calc(26px * var(--ui-scale));
+    transition: border-color var(--t-fast), background var(--t-fast),
+                box-shadow var(--t-fast);
+}
+.field.big {
+    height: calc(84px * var(--ui-scale));
+    font-size: calc(28px * var(--ui-scale));
+}
+
+/* Native <select> popup styling.
+ *
+ * Two problems this addresses, both caused by the popup being drawn OUTSIDE the
+ * page's normal styling:
+ *
+ * 1. SCROLLBAR. reset.css hides scrollbars globally with
+ *    *::-webkit-scrollbar { display: none }, but that never reached the select
+ *    popup — nothing else in the app shows a scrollbar, so the language list was
+ *    the only place one appeared. Re-hiding it explicitly on the select and its
+ *    options catches the popup's own scroll container.
+ *
+ * 2. HIGHLIGHT COLOUR. The highlighted option used the platform default — a hard,
+ *    saturated purple that matches nothing else in the app. Buttons (.btn.focused)
+ *    and nav items use a SOFT accent wash (--accent-soft) with a cyan (--accent-2)
+ *    border, which reads bluey rather than violent. The option highlight now uses
+ *    the same family.
+ *
+ * Chromium 53 note: option background/colour styling is honoured on this engine
+ * (the popup is rendered by the engine, not the OS, on webOS). :checked and
+ * :hover on <option> are both supported.
+ */
+.field::-webkit-scrollbar,
+.field option::-webkit-scrollbar {
+    display: none;
+    width: 0;
+    height: 0;
+}
+/* The language popup still showed a scrollbar. The rule above scoped it to
+ * ".field option", but the scroll container of a native <select> popup is the
+ * select's OWN listbox, not the <option> — so the bar was never hit. Target the
+ * select's scrollbar (and its thumb/track) directly. On Chromium 53 (the webOS 4
+ * floor) the popup is engine-rendered and honours these, so the 21-language list
+ * scrolls without a visible bar, matching every other list in the app. */
+select.field::-webkit-scrollbar,
+select.field::-webkit-scrollbar-thumb,
+select.field::-webkit-scrollbar-track {
+    display: none;
+    width: 0;
+    height: 0;
+    background: transparent;
+}
+.field option {
+    background: var(--bg-2);
+    color: var(--text);
+    font-size: 26px;
+    padding: 6px 10px;
+}
+.field option:checked,
+.field option:hover,
+.field option:focus {
+    /* Buttons and nav items use --accent-soft: a PURPLE at only 0.14 alpha, which
+     * over the dark navy background composites to the bluey highlight seen in the
+     * sidebar. The select popup's default was a SOLID, full-opacity purple — same
+     * hue, but at 100% it reads as a harsh slab rather than a wash.
+     *
+     * Matching the perceived colour therefore means matching the low alpha, not the
+     * raw hue. Blended slightly toward the cyan accent (--accent-2, #3ad1ff) so the
+     * result lands clearly on the blue side rather than the violet one, since the
+     * option sits on its own popup background rather than the app's navy. */
+    background: rgba(90, 140, 240, 0.35);
+    color: var(--text);
+}
+.field.focused {
+    border-color: var(--accent-2);
+    background: var(--field-focus-bg);
+    box-shadow: 0 0 0 4px rgba(58,209,255,0.2);
+}
+
+select.field {
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    appearance: none;
+    background-image: linear-gradient(45deg, transparent 50%, var(--text-2) 50%),
+                       linear-gradient(135deg, var(--text-2) 50%, transparent 50%);
+    background-position: calc(100% - 24px) 50%, calc(100% - 16px) 50%;
+    background-size: 8px 8px;
+    background-repeat: no-repeat;
+    padding-right: 50px;
+}
+/* The Language control is a <button class="field"> (opens the modal picker), not a
+ * native <select>. A button centres its text by default; align it left and centre
+ * it vertically so it reads exactly like the other .field select controls in
+ * Settings. */
+button.field#setLanguage {
+    text-align: left;
+    display: flex;
+    align-items: center;
+}
+
+/* ===== Tabs ===== */
+.tab-row {
+    display: flex;
+    margin: 20px 0 10px;
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 10px;
+}
+/* Selected (active) tab gets an accent left-edge bar, mirroring the sidebar's
+ * .nav-btn.active::before, so the chosen tab is visible independently of which
+ * control currently has focus. Focus is shown separately by .focused. */
+.tab-row .btn {
+    position: relative;
+}
+.tab-row .btn.active::before {
+    content: "";
+    position: absolute;
+    left: 12px;
+    right: 12px;
+    bottom: -11px;
+    height: 3px;
+    background: var(--accent-2);
+    border-radius: 3px 3px 0 0;
+}
+.tab-row .btn.active {
+    color: var(--text);
+    font-weight: 700;
+}
+.tab {
+    height: calc(52px * var(--ui-scale));
+    padding: 0 22px;
+    background: transparent;
+    border: 1px solid var(--border);
+    border-radius: 100px;
+    color: var(--text-2);
+    font-size: calc(26px * var(--ui-scale));
+    font-weight: 600;
+    transition: all var(--t-fast);
+}
+.tab.active {
+    background: var(--accent-soft);
+    border-color: rgba(124,92,255,0.5);
+    color: var(--text);
+}
+.tab.focused {
+    border-color: var(--focus);
+    box-shadow: var(--shadow-focus);
+}
+
+.tab-panel { display: none; }
+.tab-panel.active { display: block; }
+
+/* ===== Modal ===== */
+.modal-layer {
+    position: absolute;
+    top: 0; right: 0; bottom: 0; left: 0;
+    background: var(--scrim);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 9000;
+}
+.modal-card {
+    width: calc(820px * var(--ui-scale, 1));
+    max-width: 92vw;
+    /* Cap the card to the viewport and scroll internally if the content is
+     * taller. Without this a modal built from several long paragraphs — the
+     * worst case is the performance notice combining live-cap + search-cap +
+     * lite + settings lines at X-Large in a long language — grew to ~660px in a
+     * 720px canvas (only ~30px clearance) and, on a device that rounds text
+     * metrics slightly taller, would push the OK button off-screen with no way
+     * to reach it. overflow-y:auto makes it scroll instead. The 720 canvas sets
+     * its own max-height (92vh) and inherits this overflow. */
+    max-height: 90vh;
+    overflow-y: auto;
+    background: var(--bg-2);
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-l);
+    padding: 40px;
+    box-shadow: var(--shadow-soft);
+}
+.modal-title {
+    font-size: calc(26px * var(--ui-scale, 1));
+    font-weight: 700;
+    margin-bottom: 12px;
+    /* Center title text. The resume-playing modal
+     * already has this look; making it default unifies the modal
+     * aesthetic across the app. Modals that need left-aligned text
+     * (e.g. a long-form info dialog) can override .modal-title in
+     * their own scoped rule. */
+    text-align: center;
+}
+.modal-body,
+.modal-body-text {
+    font-size: calc(26px * var(--ui-scale, 1));
+    color: var(--text-2);
+    line-height: 1.5;
+    margin-bottom: 28px;
+    /* Center body text to match the title. */
+    text-align: center;
+}
+/* Paragraph blocks inside a modal body built from multiple lines (e.g. the
+   performance notice), so the lines are visually separated. */
+.modal-para {
+    margin: 0 0 16px 0;
+}
+.modal-para:last-child {
+    margin-bottom: 0;
+}
+.modal-actions {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    margin-top: 28px;
+}
+/* Per-button margins (not > * + *) so spacing is correct after a wrap and
+   no flex gap is used (unsupported on old WebOS). */
+.modal-actions > .btn { margin: 6px; }
+/* Confirm/prompt modals sometimes carry a long action label on the OK button
+ * (e.g. "Delete cloud account", which in Russian/Greek is very wide and, being
+ * text-scaled, grows further at large Text Sizes). The global .btn is
+ * white-space:nowrap, so such a label overflowed the fixed-width card. In the
+ * modal action row only, allow the label to wrap to two lines and cap the button
+ * at the row width, so it stays inside the card on both canvases at every Text
+ * Size. Normal buttons elsewhere keep nowrap. Pin-keypad word keys (Del/Save)
+ * set their own sizing and must stay single-line, so exclude them. */
+.modal-actions > .btn:not(.pin-key-word) {
+    white-space: normal;
+    overflow-wrap: break-word;
+    word-wrap: break-word;
+    max-width: 100%;
+    text-align: center;
+    height: auto;
+    padding-top: calc(8px * var(--ui-scale));
+    padding-bottom: calc(8px * var(--ui-scale));
+}
+/* Playlist action sheet: it can carry up to 6 actions (EPG Refresh, Set Active,
+ * Edit, Playlist Refresh, Delete, + Cancel/Enter Credentials). In the default
+ * centred flex-wrap they packed 1-2 per row unevenly. Give this sheet a wider
+ * card and lay the buttons out as a fixed 3-column grid so they read as clean
+ * rows of three (3x2 for the common 6-action case). Scoped to .action-sheet-*
+ * so the 2-button exit/confirm dialogs are untouched. Scale-aware width. */
+.action-sheet-card {
+    /* Two action buttons per row. Both the buttons and this card scale with the
+     * TEXT scale (not the layout scale): the buttons carry text that grows and
+     * shrinks with Text Size, so the card that holds them must grow and shrink in
+     * step, otherwise on the 720 canvas (where layout is pinned but text is not)
+     * the buttons would outgrow a layout-scaled card at xlarge and collapse to one
+     * per row. --txt-scale drives text on 720; on the 1080 canvas --txt-scale is
+     * undefined so it falls back to --ui-scale, which already tracks Text Size
+     * there. Base holds two ~370px buttons + margins + card padding. */
+    width: calc(880px * var(--txt-scale, var(--ui-scale, 1)));
+    max-width: 94vw;
+}
+.action-sheet-actions {
+    /* Flex-wrap + centre so an incomplete last row (e.g. Delete / Cancel under a
+     * 3-up top row) is centred rather than left-packed like a rigid grid. Buttons
+     * share a consistent basis so the top row still reads as even columns. */
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    align-content: center;
+}
+.action-sheet-actions.modal-actions > .btn {
+    /* Selector carries both classes (the row element has class
+     * "modal-actions action-sheet-actions") so this matches the wrap rule's
+     * specificity (0,3,0) above and, coming later in the file, wins the cascade
+     * to restore nowrap.
+     *
+     * Two per row. Width tracks the TEXT scale so a button grows and shrinks with
+     * its own label rather than being pinned as if it were a layout box: on 720
+     * the base .btn already rebinds --ui-scale to --txt-scale, and on 1080
+     * --ui-scale is itself text-driven, so calc(370px * --ui-scale) tracks text on
+     * both canvases. 370px base holds the longest label in this sheet (Bulgarian
+     * "Source Refresh", ~320px of text at base) with comfortable padding, so no
+     * label needs to wrap at any Text Size on either canvas — measured across all
+     * 22 languages. margin: 6px is inherited from ".modal-actions > .btn" above. */
+    flex: 0 0 auto;
+    width: calc(370px * var(--ui-scale, 1));
+    padding: 0 calc(22px * var(--ui-scale, 1));
+    /* Override the .modal-actions wrap rule back to single-line. The base .btn is
+     * also nowrap, but the intervening .modal-actions rule flips it to normal, so
+     * this restatement is a deliberate override of that rule, not of the base. */
+    white-space: nowrap;
+    overflow-wrap: normal;
+    word-wrap: normal;
+}
+
+/* ===== Toast ===== */
+.toast {
+    position: absolute;
+    bottom: 60px;
+    left: 50%;
+    transform: translateX(-50%) translateY(20px);
+    background: rgba(0,0,0,0.55);
+    border: none;
+    border-radius: 24px;
+    padding: calc(16px * var(--ui-scale)) calc(26px * var(--ui-scale));
+    font-size: calc(26px * var(--ui-scale));
+    color: #fff;
+    z-index: 8000;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.25s, transform 0.25s;
+    max-width: 360px;
+    text-align: center;
+}
+.toast.show {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+}
+/* Progress toast: the toast breathes (opacity only, like the totals chip) so a long load never looks frozen.
+ * A sweeping bar was tried in 1.0.12.5 and was not smooth on webOS 6, so there is none. */
+.toast.busy { animation: toastPulse 1.6s ease-in-out infinite; }
+@keyframes toastPulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.7; } }
+.toast.err { background: rgba(200,50,50,0.7); }
+.toast.ok { background: rgba(0,0,0,0.55); }
+
+/* ===== Virtual keyboard (hidden for now; activated via UI) ===== */
+.vkeyboard {
+    position: fixed;
+    bottom: 40px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--bg-2);
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-l);
+    padding: 20px;
+    z-index: 9000;
+    box-shadow: var(--shadow-soft);
+}
+.vk-preview {
+    background: var(--bg-1);
+    border: 2px solid var(--accent-2);
+    border-radius: var(--radius-m);
+    padding: 14px 18px;
+    margin-bottom: 14px;
+    color: var(--text);
+    font-size: calc(26px * var(--ui-scale));
+    font-weight: 600;
+    min-height: 50px;
+    word-break: break-all;
+    position: relative;
+    box-shadow: 0 0 0 4px rgba(58,209,255,0.2);
+}
+/* Long-press menu on a text field (touch) */
+.field-menu { position: fixed; z-index: 99998; display: flex; background: var(--bg-2, #1b1d2b); border: 1px solid var(--border-strong); border-radius: var(--radius-m); box-shadow: 0 6px 24px rgba(0,0,0,0.5); overflow: hidden; }
+.field-menu-btn { min-height: calc(56px * var(--ui-scale)); padding: 0 calc(22px * var(--ui-scale)); background: transparent; border: 0; border-right: 1px solid var(--border-strong); color: var(--text); font-size: calc(26px * var(--ui-scale)); font-weight: 600; }
+.field-menu-btn:last-child { border-right: 0; }
+.vk-preview-content {
+    padding-right: calc(86px * var(--ui-scale));
+}
+.vk-toggle-pass {
+    position: absolute;
+    right: 6px;
+    top: 4px;
+    bottom: 4px;
+    min-width: calc(72px * var(--ui-scale));
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: 6px;
+    padding: 0 calc(14px * var(--ui-scale));
+    color: var(--text-3);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background var(--t-fast), border-color var(--t-fast);
+    z-index: 10;
+}
+.vk-toggle-pass.focused {
+    background: var(--accent-soft);
+    color: var(--text);
+    border-color: var(--accent);
+}
+.vk-preview-label {
+    font-size: calc(26px * var(--ui-scale));
+    color: var(--text-3);
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    margin-bottom: 6px;
+}
+/* Blinking caret rendered between text spans in the
+ * preview, marking cursor position. Width:0 with a left-border keeps
+ * it from taking horizontal space (so cursor sits BETWEEN characters
+ * rather than pushing them apart). vk-empty-hint replaces the previous
+ * "(empty)" plain text — now lives alongside the caret.
+ * Blink speed 1s → 0.5s per user request (felt sluggish). */
+.vk-caret {
+    display: inline-block;
+    width: 0;
+    /* Caret colour now matches the preview text
+     * (was the purple accent). Blink slowed 0.5s → 0.75s per request. */
+    border-left: 2px solid var(--text);
+    height: 1.1em;
+    vertical-align: text-bottom;
+    margin: 0 1px;
+    animation: vkCaretBlink 0.75s steps(2) infinite;
+}
+@keyframes vkCaretBlink {
+    50% { border-left-color: transparent; }
+}
+.vk-empty-hint {
+    color: var(--text-3);
+    font-weight: 400;
+    margin-left: 8px;
+}
+.vkeyboard .vk-row {
+    display: flex;
+    margin-bottom: 8px;
+    justify-content: center;
+}
+.vkeyboard .vk-key {
+    width: calc(68px * var(--ui-scale));
+    height: calc(68px * var(--ui-scale));
+    background: var(--bg-3);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    color: var(--text);
+    font-size: calc(26px * var(--ui-scale));
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all var(--t-fast);
+    /* Margin scales with --ui-scale (was fixed 8px). Fixed margins broke row
+     * alignment at 720: rows have different key counts (11 top vs 6 bottom), so
+     * the unscaled margin total differed per row while the key WIDTHS scaled — the
+     * bottom row (SPACE row) came out ~14px narrower than the letter rows at 720
+     * (fine at base ×1.0, visibly short at ×0.667). Scaling the margin too keeps
+     * every row proportional at every scale, so SPACE=448 (6 keys' span) lines up
+     * on both 720 and full size. box-sizing:border-box so borders don't add width. */
+    margin: 0 calc(4px * var(--ui-scale));
+    box-sizing: border-box;
+}
+/* Drawn check mark on the Done key (see vkLabel / renderVKeyboard in ui-modal.js):
+ * sized in em so it tracks the label font like the arrow glyphs beside it. */
+.vkeyboard .vk-key .vk-tick {
+    width: 0.72em;
+    height: 0.72em;
+    margin-right: 0.3em;
+    flex-shrink: 0;
+}
+.vkeyboard .vk-key.focused {
+    background: var(--accent-soft);
+    border-color: rgba(124,92,255,0.4);
+    color: var(--text);
+}
+.vkeyboard .vk-key.wide {
+    /* Fixed width (keeps row alignment predictable) but sized for the LONGEST
+     * localized action label at Extra-Large: the label is arrow + word, e.g. Greek
+     * "← Διαγραφή" (~146px of text at X-Large on 1080). 168px left it edge-to-edge
+     * and clipping on-device; 190px gives ~20px of breathing room around the widest
+     * label. Scales with --ui-scale so 720 tracks it (190*0.667). */
+    width: calc(190px * var(--ui-scale));
+    font-size: calc(26px * var(--ui-scale));
+    padding: 0 calc(6px * var(--ui-scale));
+    white-space: nowrap;
+}
+/* SPACE = 448px = the visual span of 6 normal keys (6×(68px + scaled margin)
+ * minus one margin). Row alignment holds at every scale because the key margin
+ * scales with --ui-scale (see .vk-key above); a fixed margin made this row short
+ * at 720. */
+.vkeyboard .vk-key.xwide {
+    width: calc(448px * var(--ui-scale));
+    font-size: calc(26px * var(--ui-scale));
+}
+/* Protocol keys (http:// , https://): sized to span exactly TWO normal keys
+ * plus the gap between them (68 + 8 + 68 = 144px), so they read as a clean
+ * double-width key on the grid rather than an odd in-between size. Standard 26px
+ * key font. Scales with --ui-scale so 720 tracks it. The URL helper row centers
+ * (justify-content:center on .vk-row); with two 144px protocol keys + the short
+ * suffix keys it stays within the standard rows' width. */
+.vkeyboard .vk-key.urlkey {
+    width: calc(144px * var(--ui-scale));
+    font-size: calc(26px * var(--ui-scale));
+    white-space: nowrap;
+}
+/* Touch keyboard: half-width icon keys (two = one old 190px wide key + margins),
+ * a double-height Done that overhangs into the bottom row (negative margin keeps the
+ * row's own height at one key), and a spacer that holds that room open. */
+.vkeyboard .vk-key.vk-icon {
+    width: calc(91px * var(--ui-scale));
+    padding: 0;
+}
+.vkeyboard .vk-key.vk-icon svg {
+    width: 1.15em;
+    height: 1.15em;
+}
+.vkeyboard .vk-key.vk-done-tall {
+    width: calc(190px * var(--ui-scale));
+    height: calc(136px * var(--ui-scale) + 8px);
+    margin-bottom: calc(-68px * var(--ui-scale) - 8px);
+    align-self: flex-start;
+    padding: 0;
+}
+.vkeyboard .vk-key.vk-done-tall svg {
+    width: 1.5em;
+    height: 1.5em;
+}
+.vkeyboard .vk-spacer {
+    width: calc(198px * var(--ui-scale));
+    height: calc(68px * var(--ui-scale));
+    flex: none;
+}
+/* ===== Spinner ===== */
+.spinner {
+    width: 64px;
+    height: 64px;
+    border: 4px solid rgba(var(--fg-rgb),0.1);
+    border-top-color: var(--accent-2);
+    border-radius: 50%;
+    animation: spin 900ms linear infinite;
+}
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+/* Loading overlay */
+.loading-overlay {
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: var(--scrim);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    z-index: 8000;
+}
+
+.loading-overlay.hidden { display: none; }
+.loading-spinner {
+    /* Matches the Live "Loading stream" spinner (.spinner): 64px / 900ms. */
+    width: 64px;
+    height: 64px;
+    border: 4px solid rgba(var(--fg-rgb),0.1);
+    border-top-color: var(--accent-2);
+    border-radius: 50%;
+    animation: spin 900ms linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+.loading-text {
+    /* Matches the "Loading stream" label (.ploading-text): uppercase,
+     * letter-spacing, and the 18px spinner/text gap. */
+    color: var(--text-2);
+    font-size: calc(26px * var(--ui-scale));
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    margin-top: 18px;
+}
+
+/* Modal vertical buttons */
+.modal-btn {
+    /* Width is set inline per-button (49% with a
+     * margin gutter) so the 2×2 sign-in grid lines up with the text
+     * fields above it. box-sizing here keeps padding/border from
+     * inflating that width on WebOS 6.5. The old fixed width:50% is
+     * dropped — it competed with the inline value and caused the
+     * uneven button sizing the user saw on the TV. */
+    margin: 0;
+    text-align: center;
+    box-sizing: border-box;
+    /* These sit inside bodyEl, not the .modal-actions footer, so the footer's
+     * wrap rule does not reach them. They are fixed-share flex halves (see
+     * .login-btn-l/.login-btn-r), so at large Text Sizes plus a long language a
+     * nowrap label overflowed its half — worst on 720 where each half is ~176px.
+     * Allow the label to wrap to a second line; height:auto and vertical padding
+     * keep a two-line label from being clipped. */
+    white-space: normal;
+    overflow-wrap: break-word;
+    word-wrap: break-word;
+    height: auto;
+    min-height: calc(56px * var(--ui-scale));
+    padding-top: calc(8px * var(--ui-scale));
+    padding-bottom: calc(8px * var(--ui-scale));
+}
+.modal-btn.focused {
+    transform: none;
+    box-shadow: none;
+}
+/* Picker list buttons */
+.modal-card .btn.focused {
+    box-shadow: none;
+}
+
+/* Category manager */
+.cat-mgr-row.focused {
+    background: var(--accent-soft);
+}
+.check-toggle {
+    width: calc(40px * var(--ui-scale, 1));
+    height: calc(40px * var(--ui-scale, 1));
+    margin-right: calc(14px * var(--ui-scale, 1));
+    border-radius: 6px;
+    border: 2px solid rgba(var(--fg-rgb),0.32);
+    background: rgba(var(--fg-rgb),0.08);
+    color: transparent;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: calc(28px * var(--ui-scale));
+    font-weight: 700;
+    line-height: 1;
+    flex-shrink: 0;
+}
+.cat-mgr-row.focused .mgr-check {
+    border-color: var(--focus);
+}
+
+/* There is no .pass-reveal-toggle rule anywhere: the in-field eye
+ * toggle was dropped in favour of the vkeyboard's own show-password toggle, which is
+ * the canonical way to reveal passwords on the TV. The class is assigned to nothing —
+ * don't re-add a rule for it. */
+
+/* ===== CSP utility classes =====
+ * Replace static inline style="..." attributes (which a strict CSP
+ * style-src 'self' blocks) with equivalent classes. Values match the
+ * originals exactly. calc() is webOS 6.5-safe. */
+.note-center {
+    margin-top: 8px;
+    font-size: calc(26px * var(--ui-scale));
+    color: rgba(var(--fg-rgb),0.55);
+    text-align: center;
+}
+.mr-10 { margin-right: 10px; }
+/* Initial hidden state for elements JS later reveals by setting an explicit
+ * display value (e.g. el.style.display = 'flex'). NON-important so that inline
+ * show wins. Replaces inline style="display:none" for strict-CSP compatibility. */
+/* Plain (NOT !important) on purpose. This hides an element at first paint; the
+ * element is then revealed either by JS setting an INLINE style.display (which
+ * beats this plain class rule) or by classList.remove('init-hidden'). Making this
+ * !important would defeat the inline-style reveal — that is exactly what broke the
+ * player transport/seek controls once. So it stays plain. */
+.init-hidden { display: none; }
+.mr-8 { margin-right: 8px; }
+.pt-8 { padding-top: 8px; }
+/* margin-left: -4px cancels the 4px left margin on the first button in each row so
+ * the cluster's left edge lines up flush with the other settings controls (the
+ * .field dropdowns above/below sit at the ctl's left edge with no inset). */
+/* Sync cluster: single left-aligned column. The buttons used to lay out 2,2,1,1
+ * in a wider cluster, but that cluster (being wider than the 340px control column)
+ * started further left than every other settings control and so never lined up.
+ * Since all .setting-ctl are right-anchored, the only way to left-align the
+ * buttons with the dropdowns is to give the cluster the SAME width — at which
+ * point two buttons per row no longer fit, so they stack one per row (the agreed
+ * fallback). Column layout, every button full-width, so all six share one left
+ * edge that matches the other controls. */
+.sync-ctl-wrap { display: flex; flex-direction: column; }
+/* Full-width stacked buttons: allow the label to wrap. These carry long action
+ * labels (e.g. the zero-knowledge sync setup/unlock strings, which in Russian and
+ * Greek run ~45 characters and, being text-scaled, clip against the fixed 100%
+ * width at larger Text Sizes). They are already full-width in a column, so wrapping
+ * to a second line costs no horizontal room. height:auto + vertical padding keeps a
+ * two-line label from being clipped. */
+.btn-half, .btn-full-m {
+    width: 100%;
+    white-space: normal;
+    overflow-wrap: break-word;
+    word-wrap: break-word;
+    margin: 4px 0;
+    height: auto;
+    min-height: calc(56px * var(--ui-scale));
+    padding-top: calc(8px * var(--ui-scale));
+    padding-bottom: calc(8px * var(--ui-scale));
+}
+.w-full { width: 100%; }
+/* Wipe All Data: long localisations ("Εκκαθάριση όλων των δεδομένων") clip against
+ * the base .btn nowrap. Allow wrapping to 2 lines; base .btn now uses min-height so
+ * the button grows to fit. */
+#setReset {
+    white-space: normal;
+    line-height: 1.2;
+    padding-top: calc(8px * var(--ui-scale));
+    padding-bottom: calc(8px * var(--ui-scale));
+    height: auto;
+}
+
+/* ===== Modal picker utility classes (CSP phase 2) =====
+ * Replace static cssText assignments in ui-modal.js so the module doesn't write
+ * inline style strings (blocked by a strict CSP). Values match the originals. */
+.modal-pick-list { max-height: 420px; overflow-y: auto; display: flex; flex-direction: column; padding: 0 2px; }
+/* Small horizontal inset on the picker rows so a highlighted row's focus wash/border
+ * sits comfortably inside the card rather than flush against the padding edge.
+ * (.btn.focused is a background wash + border, no scale — an earlier version scaled
+ * rows 1.02x, which is why this inset existed; the inset is kept for breathing room.) */
+.modal-pick-row { width: auto; margin: 3px 6px; text-align: left; flex-shrink: 0; }
+/* Picker whose labels can be long (Sports event: channel names): rows wrap and grow taller. */
+.modal-pick-wrap .modal-pick-row { white-space: normal; text-align: left; line-height: 1.3; padding-top: calc(10px * var(--ui-scale, 1)); padding-bottom: calc(10px * var(--ui-scale, 1)); }
+/* Column-3 manual-search action buttons (Search / Cancel): centre the auto-width
+ * button within its column. display:flex overrides .btn's inline-flex so margin
+ * auto centres it; justify-content centres the label. (These are the buttons under
+ * the Title/Year inputs — NOT the column-1 rows.) */
+.modal-pick-row.subm-action {
+    display: flex;
+    /* width:100% (was auto) so the Search and Cancel buttons match each other AND
+     * the full-width title/year inputs above them in the same column. Override the
+     * inherited .modal-pick-row margin (3px 6px): with width:100% the 6px side
+     * margins pushed the button 6px past the column, so it sat off-centre to the
+     * right. Keep only vertical margin. */
+    width: 100%;
+    margin: 3px 0;
+    box-sizing: border-box;
+    justify-content: center;
+    text-align: center;
+}
+.modal-pick-loading { padding: 30px 10px; text-align: center; color: rgba(var(--fg-rgb),0.65); }
+.modal-pick-note { padding: 8px 4px 6px;
+    font-size: calc(26px * var(--ui-scale));; color: rgba(var(--fg-rgb),0.5); }
+
+/* ===== Login/sign-in modal utility classes (CSP phase 2) =====
+ * Replace static cssText in the app.js login/reset modal builders. Values match
+ * the originals. box-sizing on the buttons preserves the equal-width flex split. */
+.login-field { width: 100%; padding: 12px; margin-bottom: 20px; }
+.login-field-tight { margin-bottom: 12px; }
+.login-actions { display: block; width: 100%; margin-top: 28px; }
+.login-actions-col { display: flex; flex-direction: column; align-items: center; }
+.login-row { display: flex; width: 100%; }
+.login-row-gap { margin-bottom: 10px; }
+.login-btn-l { flex: 1 1 0; min-width: 0; margin: 0 12px 0 0; box-sizing: border-box; }
+.login-btn-r { flex: 1 1 0; min-width: 0; margin: 0; box-sizing: border-box; }
+
+/* ===== Four-column subtitle wizard (Title | Language | Subtitles | Offset) ===== */
+.sub4-wrap { display: flex; flex-direction: row; width: 100%; }
+.sub4-col { flex: 1 1 0; min-width: 0; flex-shrink: 1; max-height: 62vh; overflow-y: auto; padding: 0 10px; box-sizing: border-box; border-right: 1px solid var(--border-strong, rgba(var(--fg-rgb),0.14)); }
+/* The manual-search column (title/year inputs + Search/Cancel) needs more width than
+ * the language list / info columns — at 720 + X-Large the inputs' text scales up
+ * (--txt-scale) while the modal width scales down (--ui-scale), so an equal-quarter
+ * column clipped "Title (e.g. The Matrix)". Give it a larger flex share. */
+.sub4-col.sub4-search-col { flex: 1.5 1 0; }
+.sub4-col.sub4-last { border-right: 0; }
+.sub4-row { width: 100%; margin: 3px 0; text-align: left; flex-shrink: 0;
+    /* These buttons sit in a narrow 25%-of-modal column, so the base .btn
+     * white-space:nowrap + 26px side padding let long localised labels
+     * ("Пребарај по наслов…" in mk) overflow past both edges (see subtitles
+     * modal). Allow wrapping and use tighter, scaled side padding so the label
+     * stays inside the button; min-height on .btn lets it grow for a 2nd line.
+     * The shipped labels are multi-word, so they wrap cleanly at SPACES — the
+     * longest single word across all languages is ~14 chars (el
+     * "Πληκτρολογήστε"), which fits the column on one line. overflow-wrap (NOT
+     * word-break) is the only break rule: it splits a word solely as a LAST
+     * resort when the word genuinely cannot fit, so no real label breaks mid-word
+     * — but a future over-long word wraps instead of overflowing the button. */
+    white-space: normal;
+    padding: calc(10px * var(--ui-scale, 1)) calc(14px * var(--ui-scale, 1));
+    line-height: 1.2;
+    overflow-wrap: break-word;
+}
+.sub4-colhead { padding: 4px 4px 10px;
+    font-size: calc(26px * var(--ui-scale));; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; color: rgba(var(--fg-rgb),0.45); }
+.sub4-empty { padding: 22px 6px; text-align: center; color: rgba(var(--fg-rgb),0.4);
+    font-size: calc(26px * var(--ui-scale));; }
+.sub4-info { padding: 6px 4px;
+    font-size: calc(26px * var(--ui-scale));; color: rgba(var(--fg-rgb),0.7); line-height: 1.4; }
+.sub4-offval { padding: 10px 4px; font-size: calc(26px * var(--ui-scale)); font-weight: 700; text-align: center; color: var(--text); }
+/* .sub4-syncintro removed: its element is no longer created (it duplicated the
+ * live status line below it). */
+/* The sync note and the Tag buttons were var(--accent) — a saturated purple at full
+ * opacity, which read as an alert rather than a hint against the dark panel. Softened
+ * to the cyan accent, which is what the rest of the app uses for informational text
+ * (see .accent in main.css), and to a muted white for the buttons so they sit with
+ * their neighbours instead of shouting over them. */
+/* Item 7: the easy-sync hint matches the column TITLE colour (.sub4-colhead) so
+ * it reads as the section's own supporting text rather than a coloured callout. */
+.sub4-syncnote {
+    padding: 8px 8px;
+    font-size: calc(26px * var(--ui-scale));
+    line-height: 1.35;
+    color: rgba(var(--fg-rgb),0.45);
+    text-align: center;
+}
+/* Item 6: the Tag audio / Tag subtitle buttons drop their dimmer override so they
+ * inherit the same .btn text colour as every other subtitle button in the modal. */

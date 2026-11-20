@@ -1,0 +1,1 @@
+{"id":"com.xtivio.iptv.service","description":"Xtivio portal helper service","services":[{"name":"com.xtivio.iptv.service","commands":[{"name":"ping","description":"Is the service installed and running"},{"name":"fetch","description":"HTTP GET with caller-chosen headers, answer streamed in pieces"},{"name":"cancel","description":"Stop a running fetch"}]}]}

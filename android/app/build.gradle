@@ -1,0 +1,154 @@
+plugins {
+    id 'com.android.application'
+    id 'org.jetbrains.kotlin.android'
+}
+
+/*
+ * XTIVIO VERSIONING — unified across Android / webOS / Tizen
+ * ------------------------------------------------------------
+ * ONE shared release version lives in all three platform manifests at once:
+ * this file's xtivioVersion below, ../appinfo.json's "version", and
+ * ../tizen/config.xml's version= attribute. All three must read the exact
+ * same x.y.z string — enforced by version-bump-check.py, which reads all
+ * three files and fails the build if they disagree. Each platform's actual
+ * package file still has to be copied out and built separately (outside
+ * this repo) — this only keeps the three SOURCE manifests in sync.
+ *
+ * xtivioInternalBuild (0-9) is an INTERNAL dev-iteration counter within one
+ * release cycle — visible only in config.js's INSTALL_TOKEN, the changelog,
+ * and zip filenames, NEVER in the three real manifest version fields above:
+ * webOS and Tizen both strictly require plain x.y.z and would reject a 4th
+ * part. Bump this (0-9) on every delta shipped within one release cycle.
+ * When a real release/submission actually goes out, bump xtivioVersion's
+ * PATCH number instead and reset this back to 0.
+ *
+ * versionName  = xtivioVersion        <- STORE-FACING, matches the other two
+ *                                        platforms' manifests exactly.
+ *
+ * versionCode  = DERIVED, never hand-set — major*1000000 + minor*10000 +
+ *                patch*100 + xtivioInternalBuild. Google Play requires each
+ *                uploaded APK/AAB to have a strictly higher versionCode than
+ *                the last; this formula is monotonic as long as no part is
+ *                ever rolled backward, and stays far under Play's 2.1
+ *                billion versionCode ceiling for any realistic version
+ *                numbers. Invisible to users.
+ *
+ * XTIVIO_BUILD_ID = "xtivio-${xtivioVersion}.${xtivioInternalBuild}" —
+ *                surfaced to the web layer via AndroidBridge, embedded in
+ *                the output filename, and what config.js's INSTALL_TOKEN
+ *                must match exactly (checked by version-bump-check.py).
+ */
+def xtivioVersion = "1.0.12"                         // <-- bump the PATCH number at each real release
+def xtivioInternalBuild = 9                        // <-- bump 0-9 per delta within one release cycle
+def xtivioVersionParts = xtivioVersion.tokenize('.').collect { it.toInteger() }
+def xtivioVersionCode = xtivioVersionParts[0] * 1000000 + xtivioVersionParts[1] * 10000 + xtivioVersionParts[2] * 100 + xtivioInternalBuild
+def xtivioBuildId = "xtivio-${xtivioVersion}.${xtivioInternalBuild}"
+
+android {
+    namespace 'com.xtivio.iptv'
+    compileSdk 36
+
+    defaultConfig {
+        applicationId "com.xtivio.iptv"
+        minSdk 24          // Google Play (automatic protection) requires 24 (Android 7.0);
+                   // Media3 1.11 itself needs 23. Covers all Android TV / Google TV
+                   // sets in the field.
+        targetSdk 36
+        versionCode xtivioVersionCode   // derived from xtivioVersion + xtivioInternalBuild, see note above
+        versionName xtivioVersion       // matches appinfo.json / config.xml exactly
+
+        buildConfigField "String", "XTIVIO_BUILD_ID", "\"${xtivioBuildId}\""
+    }
+
+    buildFeatures {
+        buildConfig true
+    }
+
+    // DIRECT (sideload) build only: app/direct.flag (created by prepare.sh direct) merges
+    // direct-overlay/AndroidManifest.xml, which adds the install permission and the
+    // FileProvider used by the in-app update. Without the flag (store builds) the manifest
+    // is exactly the main one.
+    if (file('direct.flag').exists()) {
+        sourceSets {
+            release { manifest.srcFile 'direct-overlay/AndroidManifest.xml' }
+            debug { manifest.srcFile 'direct-overlay/AndroidManifest.xml' }
+        }
+    }
+
+    signingConfigs {
+        // Release signing is supplied at build time via gradle.properties or
+        // environment (never commit a keystore). If not present, the release
+        // build still assembles unsigned so it can be signed with apksigner /
+        // Play App Signing separately.
+        release {
+            def ksPath = project.findProperty("XTIVIO_KEYSTORE") ?: System.getenv("XTIVIO_KEYSTORE")
+            if (ksPath) {
+                storeFile file(ksPath)
+                storePassword (project.findProperty("XTIVIO_KEYSTORE_PW") ?: System.getenv("XTIVIO_KEYSTORE_PW"))
+                keyAlias (project.findProperty("XTIVIO_KEY_ALIAS") ?: System.getenv("XTIVIO_KEY_ALIAS"))
+                keyPassword (project.findProperty("XTIVIO_KEY_PW") ?: System.getenv("XTIVIO_KEY_PW"))
+            }
+        }
+    }
+
+    buildTypes {
+        release {
+            // R8 code shrinking/obfuscation. It only
+            // touches bytecode, never assets/. The page calls AndroidBridge methods
+            // by name, so proguard-rules.pro keeps that class whole. Debug builds
+            // stay unminified. Upload the mapping file (app/build/outputs/mapping/
+            // release/mapping.txt) to Play for readable crash traces; an .aab
+            // build includes it automatically.
+            minifyEnabled true
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+            def rel = signingConfigs.release
+            if (rel.storeFile != null) {
+                signingConfig rel
+            }
+        }
+        debug {
+            applicationIdSuffix ".debug"
+            versionNameSuffix "-debug"
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+    kotlinOptions {
+        jvmTarget = '17'
+    }
+
+    // Name the output artifact after the build id so the APK filename carries
+    // the incremental tag: xtivio-androidNN.apk.
+    applicationVariants.all { variant ->
+        variant.outputs.all { output ->
+            outputFileName = "${xtivioBuildId}-${variant.buildType.name}.apk"
+        }
+    }
+}
+
+dependencies {
+    implementation 'androidx.activity:activity:1.9.3'
+    implementation 'androidx.core:core-ktx:1.13.1'
+
+    // Media3 (ExoPlayer) — native playback for the containers/codecs the Android
+    // WebView cannot handle: MKV/AVI, HEVC/H.265, AC3/EAC3/DTS. All media3
+    // modules MUST share the same version. 1.11.0 is the current stable line
+    // (requires minSdk 23).
+    def media3_version = "1.11.0"
+    implementation "androidx.media3:media3-exoplayer:$media3_version"
+    implementation "androidx.media3:media3-exoplayer-hls:$media3_version"
+    implementation "androidx.media3:media3-datasource:$media3_version"
+    implementation "androidx.media3:media3-common:$media3_version"
+}
+
+// The web app is shared with webOS and Tizen and lives in ../web. It is copied into the APK's
+// assets under web/ before every build.
+tasks.register('copyWebAssets', Copy) {
+    from("${rootDir}/../web") { into 'web' }
+    into layout.buildDirectory.dir('generated/web-assets')
+}
+android.sourceSets.main.assets.srcDir(layout.buildDirectory.dir('generated/web-assets'))
+tasks.matching { it.name == 'preBuild' }.configureEach { dependsOn 'copyWebAssets' }

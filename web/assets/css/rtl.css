@@ -1,0 +1,72 @@
+/* RTL text support (Arabic), applied when <html dir="rtl"> (set by I18n.setLanguage).
+ *
+ * MODEL: RTL TEXT, LTR LAYOUT. Earlier this file mirrored the whole layout (sidebar to
+ * the right, flex rows reversed, every margin swapped). That duplicated layout values
+ * that live in screens.css / tv-720.css as hardcoded mirrors here, so any layout change
+ * — especially the 720 overrides, which are GENERATED — silently drifted out of sync in
+ * RTL and had to be re-mirrored by hand every time. That was unmaintainable.
+ *
+ * Now the LAYOUT stays LTR (one skeleton, one source of truth, 720 flows through the
+ * generator for both directions), and only the TEXT is RTL:
+ *   - <html dir="rtl"> stays set, so the browser resolves Arabic bidi/shaping and mixed
+ *     Arabic+Latin+digits correctly everywhere, including elements not listed here.
+ *   - #app forces direction:ltr so the flex/position skeleton lays out left-to-right
+ *     exactly as in LTR — visual order == DOM order, so D-pad nav needs no mirroring.
+ *   - Text-bearing blocks get direction:rtl + text-align:right so Arabic reads correctly
+ *     within that LTR skeleton.
+ *   - Directional glyphs (back arrow, chevrons) still mirror — a back arrow should point
+ *     the other way in an RTL reading context even with LTR layout.
+ *
+ * BASELINE webOS 4 = Chromium 53: only ancient properties used (direction, text-align,
+ * transform scaleX). No logical properties, :is(), flex gap.
+ */
+
+/* Keep the layout skeleton LTR even though the root is dir="rtl" (which we keep for
+ * text bidi). direction:ltr on the app root makes every flex row lay out left-to-right
+ * and stops the main-axis reversal that dir="rtl" would otherwise apply. */
+#app {
+    direction: ltr;
+}
+
+/* Text-bearing elements: read as Arabic (right-to-left within the element, right-
+ * aligned). These are leaf text blocks, NOT layout containers, so setting direction
+ * here shapes the text without reversing any row. Kept as an explicit list so we only
+ * touch text, never structure. */
+html[dir="rtl"] .section-title,
+html[dir="rtl"] .section-hint,
+html[dir="rtl"] .row-head h3,
+html[dir="rtl"] .nav-lbl,
+html[dir="rtl"] .field-label,
+html[dir="rtl"] .setting-label,
+html[dir="rtl"] .setting-desc,
+html[dir="rtl"] .toast,
+html[dir="rtl"] .search-empty,
+html[dir="rtl"] .modal-title,
+html[dir="rtl"] .modal-body,
+html[dir="rtl"] .vk-preview-label {
+    direction: rtl;
+    text-align: right;
+}
+/* The typed-value preview and its caret stay LTR even in Arabic: the vkeyboard is a
+ * Latin grid used mainly for Latin input (URLs, usernames), so the caret and LEFT/RIGHT
+ * cursor keys read left-to-right. Only the field-name HINT above it (.vk-preview-label)
+ * is RTL — that's translated UI text. Force the value LTR explicitly so it isn't caught
+ * by any inherited direction. */
+html[dir="rtl"] #vkPreviewValue {
+    direction: ltr;
+    text-align: left;
+}
+
+/* Directional glyphs still mirror: a chevron encodes direction geometrically and should
+ * point the other way in an RTL reading context. Only .chevron is currently built (the
+ * reorder chevrons); a blanket rule would flip the logo, play button and other
+ * non-directional icons, so this stays scoped to the one live glyph class. */
+html[dir="rtl"] .chevron {
+    transform: scaleX(-1);
+}
+
+/* Virtual keyboard: the QWERTY grid stays LTR (users navigate physical key positions
+ * by muscle memory), and so does the PREVIEW — the keyboard is Latin and used mainly
+ * for Latin input (URLs, usernames, search), so the caret and the LEFT/RIGHT cursor
+ * keys next to SPACE should move left-to-right. The preview is therefore NOT in the RTL
+ * text list above; it inherits LTR from #app. */

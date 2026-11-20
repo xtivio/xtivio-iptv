@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!-- Network access for M3U / Xtream / EPG / pairing / cloud sync. -->
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+
+    <!-- TV apps must NOT require a touchscreen. Declaring it not-required is
+         what makes the app installable on (and surfaced by) Android TV /
+         Google TV devices, which have no touchscreen. -->
+    <uses-feature
+        android:name="android.hardware.touchscreen"
+        android:required="false" />
+
+    <!-- UNIFIED TV + MOBILE build: leanback NOT required + both launcher intents
+         (LEANBACK_LAUNCHER for TV home row, LAUNCHER for phones/tablets), so one
+         APK installs on TVs and phones. To lock back to TV-only before a TV-only
+         submission: set leanback required=true and remove the LAUNCHER intent. -->
+    <uses-feature
+        android:name="android.software.leanback"
+        android:required="false" />
+
+    <!-- AllowBackup was true. Android's own OS-level Auto Backup for
+         Apps (unrelated to this app's own CloudSync — completely automatic,
+         no sign-in involved) was silently backing up app data (playlists,
+         pairing state, WebView localStorage/IndexedDB) to the user's Google
+         Drive and restoring it on a fresh install of the same package+
+         signing key on a device signed into that account — including the
+         SAME device after an uninstall/reinstall. Reported as "uninstall
+         then reinstall restored my previous data" — a plain reinstall
+         should be a genuinely fresh install requiring pairing again, which
+         this now is. -->
+    <application
+        android:allowBackup="false"
+        android:icon="@mipmap/ic_launcher"
+        android:banner="@drawable/banner"
+        android:label="@string/app_name"
+        android:theme="@style/Theme.Xtivio"
+        android:usesCleartextTraffic="true"
+        android:hardwareAccelerated="true"
+        android:supportsRtl="true">
+
+        <activity
+            android:name=".MainActivity"
+            android:exported="true"
+            android:configChanges="keyboard|keyboardHidden|orientation|screenLayout|screenSize|smallestScreenSize|navigation|uiMode"
+            android:launchMode="singleTask"
+            android:supportsPictureInPicture="true"
+            android:theme="@style/Theme.Xtivio">
+
+            <!-- Both launchers: LEANBACK for the Android TV home row, plain
+                 LAUNCHER for phones/tablets. -->
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LEANBACK_LAUNCHER" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+    </application>
+</manifest>

@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<widget xmlns="http://www.w3.org/ns/widgets"
+        xmlns:tizen="http://tizen.org/ns/widgets"
+        id="http://xtivio.iptv/XtivioIPTV"
+        version="1.0.12"
+        viewmodes="maximized">
+
+    <name>Xtivio</name>
+    <description>IPTV player for M3U, Xtream Codes and Stalker / MAG playlists.</description>
+    <author>Xtivio</author>
+
+    <content src="index.html"/>
+
+    <!-- script-src needs unsafe-inline/unsafe-eval for hls.js. style-src stays
+         strict (no unsafe-inline) — all styling is external CSS or el.style,
+         never inline style="..." — don't reintroduce inline styles without
+         relaxing this too, or they'll silently fail to apply. -->
+    <tizen:content-security-policy>
+        default-src * data: blob: 'unsafe-inline' 'unsafe-eval';
+        style-src * 'self';
+        script-src * 'unsafe-inline' 'unsafe-eval';
+        img-src * data: blob:;
+        media-src * data: blob:;
+        connect-src *;
+        font-src * data:;
+    </tizen:content-security-policy>
+
+    <icon src="icon.png"/>
+
+    <tizen:application id="XtivioIPTV.XtivioIPTV"
+                       package="XtivioIPTV"
+                       required_version="4.0"/>
+
+    <tizen:profile name="tv"/>
+
+    <!-- background-support="enable" requires Samsung partner approval
+         (Seller Office flags it CRITICAL pre-test) — not worth pursuing
+         since nothing here needs to keep running once minimized. -->
+    <tizen:setting screen-orientation="landscape"
+                   context-menu="disable"
+                   background-support="disable"
+                   encryption="disable"
+                   install-location="auto"
+                   hwkey-event="enable"/>
+
+    <tizen:privilege name="http://tizen.org/privilege/internet"/>
+    <tizen:privilege name="http://tizen.org/privilege/tv.inputdevice"/>
+    <tizen:privilege name="http://tizen.org/privilege/application.launch"/>
+
+    <access origin="*" subdomains="true"/>
+    <tizen:allow-navigation>*</tizen:allow-navigation>
+
+    <!-- Declares support for any screen resolution. A single specific key
+         (e.g. ...1080.1920 alone, as this used to say) filters the Tizen
+         Store listing to only that resolution — this app scales itself at
+         runtime instead, so it isn't tied to one. -->
+    <feature name="http://tizen.org/feature/screen.size.normal"/>
+</widget>
