@@ -570,7 +570,7 @@ var CloudSync = (function () {
                  * it on all their TVs. Both are defaulted in Store.getSettings so they
                  * always exist in the payload rather than only appearing once the
                  * Settings screen has been saved. */
-                var DEVICE_LOCAL_SETTINGS = ['perfCrashMarker', 'perfCrashCount', 'perfMode', 'player', 'sync', 'textSize', 'theme', 'screenMargin', 'bufferReserve', 'playerClock', 'liveCatsCollapsed', 'afr'];
+                var DEVICE_LOCAL_SETTINGS = ['perfCrashMarker', 'perfCrashCount', 'perfMode', 'player', 'sync', 'textSize', 'theme', 'screenMargin', 'bufferReserve', 'playerClock', 'liveCatsCollapsed', 'afr', 'keyboardLayout'];
                 for (var dls = 0; dls < DEVICE_LOCAL_SETTINGS.length; dls++) {
                     if (syncSettings.hasOwnProperty(DEVICE_LOCAL_SETTINGS[dls])) delete syncSettings[DEVICE_LOCAL_SETTINGS[dls]];
                 }
@@ -1083,7 +1083,7 @@ var CloudSync = (function () {
                  * overwrite the per-device text size. Guarding both directions makes
                  * the field genuinely device-local rather than merely "no longer
                  * uploaded". */
-                var DEVICE_LOCAL_PULL = { perfCrashMarker: 1, perfCrashCount: 1, perfMode: 1, player: 1, sync: 1, textSize: 1, theme: 1, screenMargin: 1, bufferReserve: 1, playerClock: 1, liveCatsCollapsed: 1, afr: 1 };
+                var DEVICE_LOCAL_PULL = { perfCrashMarker: 1, perfCrashCount: 1, perfMode: 1, player: 1, sync: 1, textSize: 1, theme: 1, screenMargin: 1, bufferReserve: 1, playerClock: 1, liveCatsCollapsed: 1, afr: 1, keyboardLayout: 1 };
                 for (lk in data.settings) {
                     if (data.settings.hasOwnProperty(lk) && !DEVICE_LOCAL_PULL[lk]) {
                         mergedSettings[lk] = data.settings[lk];

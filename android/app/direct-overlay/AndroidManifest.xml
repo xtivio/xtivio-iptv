@@ -2,8 +2,12 @@
 <!-- DIRECT (sideload) BUILD ONLY. Merged by app/build.gradle when app/direct.flag exists
      (prepare.sh direct creates it). Never present in a store build: Google Play restricts
      REQUEST_INSTALL_PACKAGES. Lets the app install the APK it downloads from latest.json. -->
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
+    <!-- Backup and Restore: lets restore list backup files copied into Download/Xtivio with a file manager on boxes
+         that have no file picker. Direct build only; the Play build uses the picker and MediaStore instead. -->
+    <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE" tools:ignore="ScopedStorage" />
     <application>
         <provider
             android:name="androidx.core.content.FileProvider"

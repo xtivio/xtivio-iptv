@@ -154,6 +154,13 @@ window.PlayerExo = (function () {
         try { b.exoPause(); } catch (e) {}
     }
 
+    /* Playback speed for the native player. Returns false when this build has no native speed control. */
+    function setSpeed(v) {
+        var b = bridge();
+        if (!b || typeof b.exoSetSpeed !== 'function') return false;
+        try { b.exoSetSpeed(v); return true; } catch (e) { return false; }
+    }
+
     function resume() {
         var b = bridge();
         if (!b) return;
@@ -308,6 +315,7 @@ window.PlayerExo = (function () {
         play: play,
         stop: stop,
         pause: pause,
+        setSpeed: setSpeed,
         resume: resume,
         seekRelative: seekRelative,
         seekTo: seekTo,

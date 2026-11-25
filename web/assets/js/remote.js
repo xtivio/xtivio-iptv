@@ -189,6 +189,8 @@ var Remote = (function () {
 
     /* ---- Event handler ---- */
     function handleKeydown(ev) {
+        // A physical keyboard types into the on-screen keyboard's field (see UI.vkPhysicalKey).
+        try { if (window.UI && UI.vkPhysicalKey && UI.vkPhysicalKey(ev)) return; } catch (ePk) {}
         var name = null;
         if (ev.keyCode != null && KEY_MAP[ev.keyCode]) name = KEY_MAP[ev.keyCode];
         else if (ev.key && KEY_NAME_MAP[ev.key]) name = KEY_NAME_MAP[ev.key];

@@ -297,6 +297,9 @@ var Store = (function () {
             // paint-then-refresh and always refreshes in the background, so a
             // cache-skip switch would only slow perceived launch for no benefit.)
             cacheVod: 'on',
+            sportsAllPl: 'on',
+            // Channel logo in the Live TV list (guide) rows. Off by default: it loads one image per visible row.
+            liveListLogos: 'off',
             // View mode per content section: 'list' (the classic two-pane category
             // list + rows) or 'card' (a full-width poster grid with a top action bar
             // and a category dropdown). Keyed by section so Live, Movies and Series

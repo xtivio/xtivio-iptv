@@ -606,6 +606,13 @@ button.field#setLanguage {
     width: 1.5em;
     height: 1.5em;
 }
+.vkeyboard .vk-gap {
+    width: calc(68px * var(--ui-scale));
+    height: calc(68px * var(--ui-scale));
+    margin: 0 calc(4px * var(--ui-scale));
+    flex: none;
+    box-sizing: border-box;
+}
 .vkeyboard .vk-spacer {
     width: calc(198px * var(--ui-scale));
     height: calc(68px * var(--ui-scale));

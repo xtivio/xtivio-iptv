@@ -29,6 +29,23 @@ var Player = (function () {
     var triedExoStuck = false;
     var webFirstPending = '';
     var exoStuckTimer = null;
+    /* TV HLS rescue. Smart-TV <video> plays .m3u8 natively, but some TVs' own HLS demuxer stalls on a playlist
+     * behind a redirect to a tokenised proxy (seen on Samsung Tizen 5.5: endless loading). When the native
+     * attempt has not started after HLS_RESCUE_MS, or it errors, the same stream is tried once through the
+     * bundled hls.js, and remembered once it really plays so the next start goes straight there. */
+    var HLS_RESCUE_MS = 8000;
+    var HLSFIRST_LS = 'xtivio.hlsFirst';
+    var triedHlsRescue = false;
+    var hlsFirstPending = '';
+    var hlsRescueTimer = null;
+    /* Start-up deadline. A stream that never reports a first sign of life (a provider that holds the
+     * connection open, or answers with something no engine reports back, such as a 407 from a provider that
+     * blocks the stream) used to leave the spinner up for as long as the engines kept retrying. play() arms
+     * this; any showLoading(false) (first picture, manifest parsed, an error) disarms it. When it fires, the
+     * engines are stopped and the error screen shows the "no answer in time" sentence with code E-TIME.
+     * Live gets less time than movies and series, which can need longer to open. Both values are in config.js. */
+    var startWd = null;
+    var startWdGen = 0;
     var WEBFIRST_LS = 'xtivio.webfirst';
     var WEBFIRST_TTL = 14 * 86400000;
     var exoOfferable = false;      // the last Exo failure was a decoder/format one another app may handle
@@ -301,6 +318,7 @@ var Player = (function () {
     var exoPictureUp = false;
     function showLoading(on) {
         if (!loadingEl) return;
+        if (!on) clearStartWd();
         if (!on && activeEngine === 'exo') exoPictureUp = true;
         if (on) loadingEl.classList.remove('hidden');
         else loadingEl.classList.add('hidden');
@@ -521,6 +539,13 @@ var Player = (function () {
     }
 
     function handleFatal(data) {
+        // A stream remembered as "plays through hls.js" that now fails there: forget it, so native is tried first again.
+        try { if (activeEngine === 'hlsjs' && lastStreamUrl && hlsFirstHas(lastStreamUrl)) hlsFirstDel(lastStreamUrl); } catch (eHd) {}
+        // A TV's own HLS player failed on an .m3u8: one retry through hls.js before anything else.
+        if (current && activeEngine === 'native' && hlsRescuable(lastStreamUrl || current.url)) {
+            startHlsRescue(lastStreamUrl || current.url, 'failed');
+            return;
+        }
         // Try fallback URL once (Xtream TS fallback)
         if (current && current.fallbackUrl && !triedFallback) {
             triedFallback = true;
@@ -670,6 +695,59 @@ var Player = (function () {
     function webFirstDel(u) {
         try { var o = webFirstLoad(); delete o[streamKey(u)]; localStorage.setItem(WEBFIRST_LS, JSON.stringify(o)); } catch (e) {}
     }
+    function clearStartWd() { if (startWd) { clearTimeout(startWd); startWd = null; } }
+    function clearHlsRescue() { if (hlsRescueTimer) { clearTimeout(hlsRescueTimer); hlsRescueTimer = null; } }
+    function hlsFirstLoad() {
+        try { var o = JSON.parse(localStorage.getItem(HLSFIRST_LS) || '{}'); return (o && typeof o === 'object') ? o : {}; } catch (e) { return {}; }
+    }
+    function hlsFirstHas(u) { var t = hlsFirstLoad()[streamKey(u)]; return !!t && (Date.now() - t) < WEBFIRST_TTL; }
+    function hlsFirstAdd(k) {
+        try {
+            var o = hlsFirstLoad(), n = Date.now(), keys = Object.keys(o);
+            keys.forEach(function (x) { if (n - o[x] >= WEBFIRST_TTL) delete o[x]; });
+            o[k] = n; keys = Object.keys(o);
+            if (keys.length > 100) { keys.sort(function (a, b) { return o[a] - o[b]; }); while (keys.length > 100) delete o[keys.shift()]; }
+            localStorage.setItem(HLSFIRST_LS, JSON.stringify(o));
+        } catch (e) {}
+    }
+    function hlsFirstDel(u) {
+        try { var o = hlsFirstLoad(); delete o[streamKey(u)]; localStorage.setItem(HLSFIRST_LS, JSON.stringify(o)); } catch (e) {}
+    }
+    /* True when a native <video> attempt on a TV for an .m3u8 URL may still be rescued through hls.js. */
+    function hlsRescuable(url) {
+        return !triedHlsRescue && isTvPlatform() && isHlsStream(url) && hlsAvailable() && autoRouting() &&
+            !(window.AndroidBridge);
+    }
+    function startHlsRescue(url, why) {
+        triedHlsRescue = true;
+        hlsFirstPending = streamKey(url);
+        clearHlsRescue();
+        plog('[player] native HLS ' + why + ' -> retry through hls.js');
+        try { if (window.XtivioDiag) window.XtivioDiag.log('HLS RESCUE: native ' + why + ' -> hls.js'); } catch (eDg) {}
+        try { if (videoEl) { videoEl.pause(); } } catch (eP) {}
+        armStartWd(current);   // the hls.js attempt gets its own full deadline
+        startStream(url, 'hlsjs');
+    }
+    function armStartWd(channel) {
+        clearStartWd();
+        var vodLike = !!(channel && /^(movies?|vod|series)$/.test(String(channel.type || '')));
+        var cfg = (typeof APP_CONFIG !== 'undefined' && APP_CONFIG) || {};
+        var ms = vodLike ? (cfg.START_DEADLINE_VOD_MS || 25000) : (cfg.START_DEADLINE_LIVE_MS || 12000);
+        var gen = ++startWdGen;
+        startWd = setTimeout(function () {
+            startWd = null;
+            if (gen !== startWdGen) return;
+            try { if (window.PlayerAVPlay) PlayerAVPlay.stop(); } catch (eA) {}
+            try { if (window.PlayerExo) PlayerExo.stop(); } catch (eE) {}
+            clearExoStuck();
+            destroyHls();
+            restoreExoSurface();
+            try { if (videoEl) videoEl.pause(); } catch (eV) {}
+            lastErrCode = 'E-TIME';
+            fireStateEvent('error', 'timeout');
+            showError(T('err_could_not_play'), T('err_timeout'));
+        }, ms);
+    }
     function clearExoStuck() { if (exoStuckTimer) { clearTimeout(exoStuckTimer); exoStuckTimer = null; } }
 
     function restoreExoSurface() {
@@ -719,7 +797,24 @@ var Player = (function () {
                 plog('[player] remembered: this stream plays in the WebView, ExoPlayer skipped');
             }
         }
+        // A TV stream whose native HLS attempt stalled before and played through hls.js: go there directly.
+        if (!forceEngine && engine === 'native' && !triedHlsRescue && isTvPlatform() && isHlsStream(url) && hlsAvailable() && autoRouting() && hlsFirstHas(url)) {
+            engine = 'hlsjs';
+            triedHlsRescue = true;
+            plog('[player] remembered: this stream plays through hls.js on this TV');
+        }
+        clearHlsRescue();
         activeEngine = engine;
+        currentSpeedIdx = 2; // every new video starts at 1x (the engines reset their own speed)
+        lunaGen++;
+        if (engine === 'native' && hlsRescuable(url)) {
+            var rescueGen = startWdGen, rescueUrl = url;
+            hlsRescueTimer = setTimeout(function () {
+                hlsRescueTimer = null;
+                // Still waiting for the first picture: the deadline watchdog is armed and not yet cleared.
+                if (rescueGen === startWdGen && startWd && !triedHlsRescue && activeEngine === 'native') startHlsRescue(rescueUrl, 'did not start');
+            }, HLS_RESCUE_MS);
+        }
         if (engine !== 'exo' && loadingEl) loadingEl.classList.remove('zap');
         fireStateEvent('engine', engine);
 
@@ -1182,6 +1277,7 @@ var Player = (function () {
 
     function play(channel) {
         if (!channel) return;
+        armStartWd(channel);
         extHandoff = 0;
         upgradeLegacyXtreamUrl(channel);
         // Stalker channels carry no direct URL — resolve one per-play (tokens
@@ -1268,6 +1364,8 @@ var Player = (function () {
         triedExoRescue = false;
         triedExoStuck = false;
         webFirstPending = '';
+        triedHlsRescue = false;
+        hlsFirstPending = '';
         exoOfferable = false;
         externalOffered = false;
         stalkerRefreshed = false;
@@ -1294,6 +1392,9 @@ var Player = (function () {
     }
 
     function stop() {
+        clearStartWd();
+        clearHlsRescue();
+        startWdGen++;
         clearExoStuck();
         exoPictureUp = false;
         // Clear any subtitle tracks first so the old VTT
@@ -1840,6 +1941,7 @@ var Player = (function () {
         videoEl.addEventListener('playing', function () {
             showLoading(false); hideError();
             if (webFirstPending) { webFirstAdd(webFirstPending); webFirstPending = ''; }
+            if (hlsFirstPending) { hlsFirstAdd(hlsFirstPending); hlsFirstPending = ''; }
         });
         videoEl.addEventListener('canplay', function () { showLoading(false); });
         // After a seek completes, re-pin the rate to the user's selected speed.
@@ -1849,9 +1951,13 @@ var Player = (function () {
         videoEl.addEventListener('seeked', function () {
             try {
                 var want = playbackSpeeds[currentSpeedIdx];
-                if (videoEl.playbackRate !== want) videoEl.playbackRate = want;
+                if (lunaRateOk()) { if (currentSpeedIdx !== 2) lunaRate(want, 0, lunaGen); }
+                else if (videoEl.playbackRate !== want) videoEl.playbackRate = want;
             } catch (e) {}
         });
+        // webOS: the TV assigns the media id when the video loads, so a speed chosen earlier is re-sent then.
+        videoEl.addEventListener('loadedmetadata', function () { if (lunaRateOk() && currentSpeedIdx !== 2) lunaRate(playbackSpeeds[currentSpeedIdx], 0, lunaGen); });
+        videoEl.addEventListener('playing', function () { if (lunaRateOk() && currentSpeedIdx !== 2) lunaRate(playbackSpeeds[currentSpeedIdx], 0, lunaGen); });
         videoEl.addEventListener('error', function () {
             Util.logErr('Native video error', videoEl.error);
             try { if (window.XtivioDiag) window.XtivioDiag.log('NATIVE <video> ERROR: ' + (videoEl.error ? ('code-' + videoEl.error.code) : 'unknown')); } catch (eD) {}
@@ -2397,11 +2503,56 @@ var Player = (function () {
     var playbackSpeeds = [0.5, 0.75, 1, 1.25, 1.5, 2];
     var currentSpeedIdx = 2; // default 1x
 
+    /* LG webOS mutes the sound whenever <video>.playbackRate is not 1, and ignores it on the MSE path. The same
+     * speeds work with sound through the platform media service (luna com.webos.media setPlayRate), which is what
+     * Stremio uses, so on webOS the rate is sent there and playbackRate is never touched (except as a last resort). */
+    var lunaGen = 0; // bumped for every new video so late retries for an old one are dropped
+    function lunaRateOk() {
+        try { return !!(window.webOS || window.PalmSystem) && typeof window.PalmServiceBridge !== 'undefined' && activeEngine !== 'exo' && activeEngine !== 'avplay'; } catch (e) { return false; }
+    }
+    function lunaRate(value, attempt, gen) {
+        if (gen !== lunaGen || !videoEl) return;
+        var id = videoEl.mediaId;
+        if (!id) {
+            // The id appears once the video has loaded: retry for about 10 s.
+            if (attempt < 20) setTimeout(function () { lunaRate(value, attempt + 1, gen); }, 500);
+            return;
+        }
+        try {
+            var b = new window.PalmServiceBridge();
+            b.onservicecallback = function (m) {
+                var ok = false;
+                try { var r = JSON.parse(m); ok = (r.returnValue !== false && !r.errorCode); } catch (eP) {}
+                if (!ok && gen === lunaGen && videoEl) {
+                    // Service refused: fall back to the plain property (this TV may then mute at other speeds).
+                    try { videoEl.playbackRate = value; } catch (eR) {}
+                }
+            };
+            b.call('luna://com.webos.media/setPlayRate', JSON.stringify({ mediaId: id, playRate: value, audioOutput: true }));
+        } catch (e) {
+            try { videoEl.playbackRate = value; } catch (e2) {}
+        }
+    }
+
+    /* Applies a speed on whichever engine is playing. Android plays through ExoPlayer and Tizen AVPlay through the
+     * platform player, so setting <video>.playbackRate does nothing there. Returns false when the engine cannot. */
+    function applySpeed(value) {
+        if (activeEngine === 'exo' && window.PlayerExo) return PlayerExo.setSpeed ? PlayerExo.setSpeed(value) : false;
+        if (activeEngine === 'avplay' && window.PlayerAVPlay) return PlayerAVPlay.setSpeed ? PlayerAVPlay.setSpeed(value) : false;
+        if (!videoEl) return false;
+        if (lunaRateOk()) { lunaRate(value, 0, lunaGen); return true; }
+        try { videoEl.playbackRate = value; } catch (e) {}
+        return true;
+    }
+    function speedValues() { return playbackSpeeds.slice(); }
+    function currentSpeed() { return playbackSpeeds[currentSpeedIdx]; }
+
     function cycleSpeed() {
         if (!videoEl) return;
-        currentSpeedIdx = (currentSpeedIdx + 1) % playbackSpeeds.length;
-        var speed = playbackSpeeds[currentSpeedIdx];
-        videoEl.playbackRate = speed;
+        var nextIdx = (currentSpeedIdx + 1) % playbackSpeeds.length;
+        var speed = playbackSpeeds[nextIdx];
+        if (!applySpeed(speed)) { if (window.UI) UI.toast(T('speed_unavailable'), 'err'); return; }
+        currentSpeedIdx = nextIdx;
         var lbl = Util.$('#infoSpeedLbl');
         if (lbl) lbl.textContent = T('speed_2');
         if (window.UI) UI.toast(T('speed') + ' ' + speed + 'x', 'ok')
@@ -2415,18 +2566,21 @@ var Player = (function () {
      * playbackRate change applied while playing, so we re-apply once shortly
      * after to make it stick without a pause/play cycle. */
     function setSpeed(value) {
-        if (!videoEl) return;
+        if (!videoEl) return false;
         var idx = -1;
         for (var i = 0; i < playbackSpeeds.length; i++) {
             if (Math.abs(playbackSpeeds[i] - value) < 0.001) { idx = i; break; }
         }
-        if (idx < 0) return;
+        if (idx < 0) return false;
+        if (!applySpeed(value)) { if (window.UI) UI.toast(T('speed_unavailable'), 'err'); return false; }
         currentSpeedIdx = idx;
-        try { videoEl.playbackRate = value; } catch (e) {}
-        // Re-apply shortly after in case the engine dropped the change mid-play.
-        setTimeout(function () {
-            if (videoEl) { try { if (videoEl.playbackRate !== value) videoEl.playbackRate = value; } catch (e2) {} }
-        }, 120);
+        // Re-apply shortly after in case the engine dropped the change mid-play (HTML5 video only).
+        if (activeEngine !== 'exo' && activeEngine !== 'avplay' && !lunaRateOk()) {
+            setTimeout(function () {
+                if (videoEl) { try { if (videoEl.playbackRate !== value) videoEl.playbackRate = value; } catch (e2) {} }
+            }, 120);
+        }
+        return true;
     }
 
     function seekRelative(delta) {
@@ -2527,7 +2681,7 @@ var Player = (function () {
         // the engine (or hls.js live-sync) can leave an elevated rate so playback
         // races to the live edge before settling — pin it to the user's selected
         // speed (1x unless they changed it) so a click-seek plays at normal speed.
-        try { videoEl.playbackRate = playbackSpeeds[currentSpeedIdx]; } catch (e) {}
+        try { if (lunaRateOk()) { if (currentSpeedIdx !== 2) lunaRate(playbackSpeeds[currentSpeedIdx], 0, lunaGen); } else videoEl.playbackRate = playbackSpeeds[currentSpeedIdx]; } catch (e) {}
         // Prefer the seekable range so this works the same as the D-pad seek for
         // BOTH VOD and live: a live stream with a DVR window exposes a seekable
         // range, and the live seek bar already draws position across that window.
@@ -2551,7 +2705,7 @@ var Player = (function () {
 
     function isVod() {
         if (!current) return false;
-        if (current.type === 'vod' || current.type === 'series') return true;
+        if (current.type === 'vod' || current.type === 'series' || current.type === 'movies' || current.type === 'movie') return true;
         // Xtream catch-up programme: a finished recording (seek/pause), although its type stays 'xtream'.
         if (current.catchup) return true;
         // Stalker/MAG content carries type 'stalker'; its kind says vod/series/live.
@@ -2614,6 +2768,8 @@ var Player = (function () {
         isVod: isVod,
         cycleSpeed: cycleSpeed,
         setSpeed: setSpeed,
+        speedValues: speedValues,
+        currentSpeed: currentSpeed,
         getExternalPlayableUrl: getExternalPlayableUrl,
         markExternalHandoff: markExternalHandoff,
         noteBackgrounded: noteBackgrounded,

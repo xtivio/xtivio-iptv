@@ -1269,7 +1269,12 @@ var Epg = (function () {
             return fetchParseEpgUrl(_curUrl, myGen, 0, _epgHdr, WANTED[playlist.id] || null).then(function (parsed) {
                 // A source that failed/emptied resolves to an empty EPG (see
                 // fetchParseEpgUrl); detect that so the merge isn't stamped fresh.
-                if (!parsed || !parsed.programmes || isEmptyParsed(parsed)) allSourcesOk = false;
+                // With the wanted-channel filter on, a healthy source can legitimately keep no programmes (an
+                // external guide that has none of this playlist's channels). It still lists its channels, so
+                // only a source with neither programmes nor channels counts as failed. Without that, such a
+                // source blocked the freshness record and every open downloaded and parsed the guide again.
+                if (!parsed || !parsed.programmes) allSourcesOk = false;
+                else if (isEmptyParsed(parsed) && !(WANTED[playlist.id] && hasChannels(parsed))) allSourcesOk = false;
                 merged = mergeParsedEpg(merged, parsed);
                 return next();
             });
@@ -1283,6 +1288,11 @@ var Epg = (function () {
     // True if a parsed EPG carries no programmes for any channel (an empty/failed
     // source resolves to makeEmptyEpg()). Used only to gate cache-freshness, not
     // to change merge behavior.
+    function hasChannels(parsed) {
+        if (!parsed || !parsed.channels) return false;
+        for (var k in parsed.channels) { if (parsed.channels.hasOwnProperty(k)) return true; }
+        return false;
+    }
     function isEmptyParsed(parsed) {
         if (!parsed || !parsed.programmes) return true;
         for (var k in parsed.programmes) {
@@ -1516,6 +1526,22 @@ var Epg = (function () {
      * playlist's parsed EPG resident — so two (or more) full ~57MB datasets piled
      * up in memory and OOM'd the TV on switch, even though a single playlist left
      * alone was fine. Called on activation to keep only the active EPG. */
+    /* Loads the saved guide index of a playlist that is NOT the active one, from the database only (no download, no
+     * parse), so a feature such as Sports can read its programmes through getProgrammesBetween. Resolves true when
+     * the playlist's guide is available. The index is small (names and ids); the programmes stay in the database and
+     * are read per channel. clearAllExcept() drops it again when another playlist becomes active. */
+    function loadCached(playlistId) {
+        if (!playlistId) return Promise.resolve(false);
+        if (STATE.byPlaylist[playlistId]) return Promise.resolve(true);
+        if (typeof IDB === 'undefined' || !IDB.epgMetaGet) return Promise.resolve(false);
+        return IDB.epgMetaGet(playlistId).then(function (rec) {
+            if (STATE.byPlaylist[playlistId]) return true;
+            if (!rec || !rec.complete || !rec.maps || (rec.coverUntil || 0) <= Date.now()) return false;
+            STATE.byPlaylist[playlistId] = rehydrateFromMaps(playlistId, rec.maps, rec.coverUntil);
+            return true;
+        })['catch'](function () { return false; });
+    }
+
     function clearAllExcept(keepId) {
         for (var pid in STATE.byPlaylist) {
             if (STATE.byPlaylist.hasOwnProperty(pid) && pid !== keepId) {
@@ -1552,6 +1578,7 @@ var Epg = (function () {
         hasEpgSource: hasEpgSource,
         clear: clear,
         clearAllExcept: clearAllExcept,
+        loadCached: loadCached,
         getNowNext: getNowNext,
         setChannelProgrammes: setChannelProgrammes,
         getProgrammesBetween: getProgrammesBetween,

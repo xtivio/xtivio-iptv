@@ -27,30 +27,6 @@ server/    optional reference pairing server (Node.js, Express)
 tools/     the quality gates the project is checked with
 ```
 
-## Install
-
-**Samsung TVs:** install Xtivio through Apps2Samsung.
-
-1. Follow the Apps2Samsung setup for your TV.
-2. Choose Xtivio from its list.
-
-You can also download the `.wgt` from [Releases](../../releases) and check the SHA-256 shown in the release notes
-against the file. A `.wgt` has to be signed with your own Samsung certificate to install on a TV, which is what
-Apps2Samsung does for you.
-
-**Android, Android TV and LG webOS:** build from this repository (see Building below).
-
-## Screenshots
-
-See the [screenshots](screenshots) folder.
-
-## Support and bug reports
-
-Open an [issue](../../issues/new/choose). Please include your TV model and year, the Xtivio version (Settings > About)
-and what you were doing. Do not post your playlist URL, username, password or MAC address.
-
-Contact: dev@xtivio.vip
-
 ## Building
 
 * **Android:** open `android/` in Android Studio, or run `./gradlew assembleRelease` there. Gradle copies `web/` into the
@@ -86,15 +62,8 @@ repository; without them the app falls back to its built-in behaviour. It is lic
 
 Copyright (C) 2026 The Xtivio authors.
 
-Xtivio is not affiliated with or endorsed by Samsung, LG or Google. Samsung, Tizen, LG, webOS and Android are trademarks of their owners.
-
-**Artwork is not part of the GPL grant.** The Xtivio name, logos, app icons, launcher banner, splash image and the
-donation QR code (`web/icon.png`, `web/splash.png`, `web/assets/img/`, and the icon and banner images under
-`android/app/src/main/res/`) are Copyright (C) 2026 The Xtivio authors, all rights reserved. They are included so the
-project builds and runs, and you may use them unmodified when you build and run this code for yourself. You may not use
-them to publish a modified version or another app, or to suggest that something is the official Xtivio app. If you
-publish a modified version, give it your own name, logo and icons. The donation QR code belongs to the project and
-must not be reused. The code stays under the licences above.
+The licence covers the code. The name "Xtivio" and its logos identify the official app: if you publish a modified
+version, please give it your own name and logo so people can tell the two apart.
 
 ## Contributing
 

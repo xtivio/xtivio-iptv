@@ -3983,11 +3983,15 @@ var App = (function () {
             var ts = $('#setTextSize');
             var pm = $('#setPerfMode');
             var ccv = $('#setCacheVod');
+            var spa = $('#setSportsAllPl');
+            var lll = $('#setLiveLogos');
             var st = Store.getSettings();
             if (p) st.player = p.value;
             if (o) st.overlayMs = parseInt(o.value, 10);
             if (ar) st.autoResume = ar.value;
             if (ccv) st.cacheVod = ccv.value;
+            if (spa) st.sportsAllPl = spa.value;
+            if (lll) st.liveListLogos = lll.value;
             if (s) st.sync = s.value;
             if (sc) st.videoScale = sc.value;
             // Persist text-size selection.
@@ -4424,6 +4428,29 @@ var App = (function () {
                 });
             });
         }
+        /* Keyboard layout picker: Auto (follows the app language) or one layout. Saved on this
+         * device only (see DEVICE_LOCAL_SETTINGS in cloudsync.js); takes effect the next time the
+         * on-screen keyboard opens. */
+        var kbBtn = $('#setKeyboardLayout');
+        if (kbBtn && UI.vkLayoutChoices) {
+            kbBtn.textContent = UI.vkLayoutLabel();
+            kbBtn.addEventListener('click', function () {
+                var ch = UI.vkLayoutChoices(), cur = (Store.getSettings().keyboardLayout) || 'auto', items = [], at = 0;
+                for (var q = 0; q < ch.length; q++) { items.push(ch[q].name); if (ch[q].id === cur) at = q; }
+                UI.openListPicker({
+                    title: T('ui_keyboard_layout'),
+                    items: items,
+                    selected: at,
+                    onSelect: function (idx) {
+                        var st = Store.getSettings();
+                        st.keyboardLayout = ch[idx].id;
+                        Store.setSettings(st);
+                        kbBtn.textContent = UI.vkLayoutLabel();
+                    }
+                });
+            });
+        }
+        try { if (window.BackupUI) BackupUI.bindSettings(); } catch (eBk) {}
         if (p) p.addEventListener('change', function () { saveSettingsDebounced(); });
         if (o) o.addEventListener('change', function () { saveSettingsDebounced(); });
         if (ar) ar.addEventListener('change', function () { saveSettingsDebounced(); });
@@ -4431,6 +4458,10 @@ var App = (function () {
         if (sc) sc.addEventListener('change', function () { saveSettingsDebounced(); });
         var ccvEl = $('#setCacheVod');
         if (ccvEl) ccvEl.addEventListener('change', function () { saveSettingsDebounced(); });
+        var spaEl = $('#setSportsAllPl');
+        if (spaEl) spaEl.addEventListener('change', function () { saveSettingsDebounced(); });
+        var lllEl = $('#setLiveLogos');
+        if (lllEl) lllEl.addEventListener('change', function () { saveSettingsDebounced(); });
 
         /* View mode selects. The VOD control governs BOTH Movies and Series (they
          * share a render path and one preference), the Live control governs Live.
@@ -4602,6 +4633,8 @@ var App = (function () {
         var ar = $('#setAutoResume');
         if (ar) ar.value = st.autoResume || 'off';
         var ccv = $('#setCacheVod'); if (ccv) ccv.value = (st.cacheVod === 'off') ? 'off' : 'on';
+        var spa = $('#setSportsAllPl'); if (spa) spa.value = (st.sportsAllPl === 'off') ? 'off' : 'on';
+        var lll = $('#setLiveLogos'); if (lll) lll.value = (st.liveListLogos === 'on') ? 'on' : 'off';
         if (s) s.value = st.sync || 'off';
         if (sc) { var sv = st.videoScale || 'contain'; if (sv === 'fill') sv = 'fill-h'; sc.value = sv; }
         var vVod = $('#setViewVod');
@@ -5381,10 +5414,11 @@ var App = (function () {
 
         var speedBtn = $('#infoSpeedBtn');
         if (speedBtn) speedBtn.addEventListener('click', function () {
-            var speeds = ['0.5x', '0.75x', '1x', '1.25x', '1.5x', '2x'];
-            var values = [0.5, 0.75, 1, 1.25, 1.5, 2];
+            var values = (Player.speedValues && Player.speedValues()) || [0.5, 0.75, 1, 1.25, 1.5, 2];
+            var speeds = [];
+            for (var sv = 0; sv < values.length; sv++) speeds.push(values[sv] + 'x');
             var vidEl = document.querySelector('#videoEl') || document.querySelector('.player-stage video');
-            var curRate = (vidEl && vidEl.playbackRate) || 1;
+            var curRate = (Player.currentSpeed && Player.currentSpeed()) || (vidEl && vidEl.playbackRate) || 1;
             var curIdx = 2;
             for (var si = 0; si < values.length; si++) {
                 if (Math.abs(values[si] - curRate) < 0.01) { curIdx = si; break; }
@@ -5394,7 +5428,7 @@ var App = (function () {
                 items: speeds,
                 selected: curIdx,
                 onSelect: function (idx) {
-                    if (Player.setSpeed) Player.setSpeed(values[idx]);
+                    if (Player.setSpeed) { if (Player.setSpeed(values[idx]) === false) return; }
                     else if (vidEl) vidEl.playbackRate = values[idx];
                     var lbl = document.getElementById('infoSpeedLbl');
                     if (lbl) lbl.textContent = T('speed_2');

@@ -1,6 +1,6 @@
 {
     "id": "com.xtivio.iptv",
-    "version": "1.0.12",
+    "version": "1.0.13",
     "vendor": "Xtivio",
     "type": "web",
     "main": "index.html",

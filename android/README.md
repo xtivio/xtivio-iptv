@@ -35,7 +35,7 @@ internal build digit (`0`-`9`) that only Android deltas use.
 
 | Thing             | Value / where it lives                                                   |
 |-------------------|--------------------------------------------------------------------------|
-| versionName       | `1.0.12` — `xtivioVersion` in `app/build.gradle`; also `appinfo.json` and `tizen/config.xml` (x.y.z only) |
+| versionName       | `1.0.13` — `xtivioVersion` in `app/build.gradle`; also `appinfo.json` and `tizen/config.xml` (x.y.z only) |
 | Internal build    | `xtivioInternalBuild` in `app/build.gradle` (0-9); resets to 0 at each release |
 | Build id          | `xtivio-<versionName>.<internal build>` — `INSTALL_TOKEN` in `config.js` must match exactly |
 | versionCode       | Derived, never hand-set: major*1000000 + minor*10000 + patch*100 + internal build. Play requires it strictly increasing. |

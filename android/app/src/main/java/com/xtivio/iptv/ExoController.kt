@@ -83,7 +83,7 @@ class ExoController(
     // ExoPlayer's HTTP User-Agent: generic by default, branded when this is true
     // (see createPlayer). The branded string carries the app version.
     private val EXO_UA_BRANDED = false
-    private val EXO_UA_BRAND = "XtivioTV/1.0.12 (ExoPlayer)"
+    private val EXO_UA_BRAND = "XtivioTV/1.0.13 (ExoPlayer)"
 
     private fun ensurePlayer() {
         if (player != null) return
@@ -779,6 +779,7 @@ class ExoController(
         } else {
             p.setMediaItem(item)
         }
+        p.setPlaybackSpeed(1f)  // a new video always starts at normal speed (the page resets its Speed label too)
         p.prepare()
         if (startMs > 0) p.seekTo(startMs)
         p.playWhenReady = true
@@ -934,6 +935,9 @@ class ExoController(
         // Do NOT hide the SurfaceView — keeping it VISIBLE preserves the Surface
         // so the next play has a valid output handle.
     }
+
+    /** Keeps pitch at normal (PlaybackParameters pitch 1) so faster or slower speech does not change voice. */
+    override fun setSpeed(speed: Float) { player?.setPlaybackSpeed(speed.coerceIn(0.25f, 2f)) }
 
     override fun pause() { player?.playWhenReady = false }
     override fun resume() { player?.playWhenReady = true }

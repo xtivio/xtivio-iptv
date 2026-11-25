@@ -44,6 +44,30 @@ class AndroidBridge(
     // The page detects this by typeof AndroidBridge.portalFetch === 'function'.
     private val portalHttp by lazy { PortalHttp(webViewProvider) }
 
+    // Backup and Restore file access (see BackupIo). The page detects it by typeof AndroidBridge.backupCaps === 'function'.
+    internal val backupIo by lazy { BackupIo(activity, webViewProvider) }
+
+    @JavascriptInterface
+    fun backupCaps(): String = backupIo.caps()
+
+    @JavascriptInterface
+    fun backupSave(reqId: String, name: String, text: String) { backupIo.save(reqId, name, text) }
+
+    @JavascriptInterface
+    fun backupPick(reqId: String) { backupIo.pick(reqId) }
+
+    @JavascriptInterface
+    fun backupSaveFolder(reqId: String, name: String, text: String) { backupIo.saveFolder(reqId, name, text) }
+
+    @JavascriptInterface
+    fun backupList(reqId: String) { backupIo.list(reqId) }
+
+    @JavascriptInterface
+    fun backupRead(reqId: String, id: String) { backupIo.read(reqId, id) }
+
+    @JavascriptInterface
+    fun backupAskAccess(reqId: String) { backupIo.askAccess(reqId) }
+
     @JavascriptInterface
     fun portalFetch(reqId: String, url: String, headersJson: String, timeoutMs: Int, maxBytes: Int) {
         portalHttp.fetch(reqId, url, headersJson, timeoutMs, maxBytes)
@@ -218,6 +242,12 @@ class AndroidBridge(
     @JavascriptInterface
     fun exoResume() {
         activity.runOnUiThread { exo.resume() }
+    }
+
+    /** Playback speed (0.5 to 2). The <video> element is not what plays on Android, so the page asks the player directly. */
+    @JavascriptInterface
+    fun exoSetSpeed(speed: Double) {
+        activity.runOnUiThread { exo.setSpeed(speed.toFloat()) }
     }
 
     @JavascriptInterface
@@ -491,6 +521,7 @@ interface ExoControllerHandle {
     fun resume()
     fun seekRelative(deltaMs: Long)
     fun seekTo(absoluteMs: Long)
+    fun setSpeed(speed: Float)
     fun setBounds(leftPx: Int, topPx: Int, widthPx: Int, heightPx: Int)
     fun setVideoRect(leftPx: Int, topPx: Int, widthPx: Int, heightPx: Int)
     fun clearBounds()

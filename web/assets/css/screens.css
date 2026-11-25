@@ -3143,6 +3143,64 @@ html:not([data-touch="1"]) [data-view-mode="list"] .vod-info-play {
     flex: 1;
     line-height: 1.3;
 }
+/* Channel logos in the guide list (Settings: Channel Logos in List View, off by default).
+ * Layout A: the logo sits above the number inside the same 92px number column, so the channel
+ * column, its header and the name width do not change. Height budget at scale 1, inside the
+ * 8px top and bottom padding (68px of content): logo 40 + gap 2 + number 20 * 1.2 = 24 -> 66px.
+ * 20px is the smallest font webOS recommends, so the number is 20px here and scales with Text Size. */
+.live-epg-ch.has-logo .live-epg-numcol {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    width: calc(92px * var(--ui-scale, 1));
+    flex-shrink: 0;
+    margin-right: 8px;   /* unscaled, same as .live-epg-ch-num, so the name width is identical */
+}
+.live-epg-ch.has-logo .live-epg-ch-num {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    margin-right: 0;
+    text-align: center;
+    font-size: calc(20px * var(--ui-scale, 1));
+    line-height: 1.2;
+}
+/* The catch-up icon sits beside the number here (stacked it would push the row past its height). */
+.live-epg-ch.has-logo .live-epg-ch-num .ch-arch {
+    width: calc(18px * var(--ui-scale, 1));
+    height: calc(18px * var(--ui-scale, 1));
+    margin: 0 0 0 calc(4px * var(--ui-scale, 1));
+    flex-shrink: 0;
+}
+.live-epg-logo {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: calc(80px * var(--ui-scale, 1));
+    height: calc(40px * var(--ui-scale, 1));
+    margin-bottom: calc(2px * var(--ui-scale, 1));
+    overflow: hidden;
+}
+.live-epg-logo-img {
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+}
+.live-epg-logo-fb {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: calc(40px * var(--ui-scale, 1));
+    height: calc(40px * var(--ui-scale, 1));
+    border-radius: calc(8px * var(--ui-scale, 1));
+    background: rgba(var(--fg-rgb), 0.08);
+    font-family: 'DisplayTV';
+    font-size: calc(22px * var(--ui-scale, 1));
+    font-weight: 700;
+    color: var(--text-3);
+}
 .live-epg-prog-row {
     position: relative;
     flex: 1;
@@ -3351,9 +3409,11 @@ html:not([data-touch="1"]) [data-view-mode="list"] .vod-info-play {
     text-align: center;
 }
 .live-top-mini-ph-title {
-    font-size: calc(26px * var(--ui-scale));; font-weight: 700; margin-bottom: 6px; color: rgba(255,255,255,0.86); }
+    font-size: calc(26px * var(--ui-scale));; font-weight: 700; margin-bottom: 6px; color: rgba(255,255,255,0.86);
+    max-width: 100%; box-sizing: border-box; padding: 0 16px; overflow-wrap: break-word; word-wrap: break-word; }
 .live-top-mini-ph-sub {
-    font-size: calc(26px * var(--ui-scale));; color: rgba(255,255,255,0.52); }
+    font-size: calc(26px * var(--ui-scale));; color: rgba(255,255,255,0.52);
+    max-width: 100%; box-sizing: border-box; padding: 0 16px; overflow-wrap: break-word; word-wrap: break-word; }
 .live-top-mini-overlay {
     position: absolute;
     left: 0; right: 0; bottom: 0;

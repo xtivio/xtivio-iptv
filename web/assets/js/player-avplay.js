@@ -499,6 +499,13 @@ window.PlayerAVPlay = (function () {
          * as every other Tizen-only control above). Not verified against a real
          * device; see the functions' own comment. */
         getAudioTracks: function () { return backend() === 'tizen' ? tizenGetAudioTracks() : []; },
-        setAudioTrack: function (index) { return backend() === 'tizen' ? tizenSetAudioTrack(index) : false; }
+        setAudioTrack: function (index) { return backend() === 'tizen' ? tizenSetAudioTrack(index) : false; },
+        /* Tizen AVPlay speed. The platform accepts a limited set (whole speeds such as 1 and 2, not 0.5 or 1.25) and
+         * throws for the rest, so a false return means the page should tell the user it is not available. */
+        setSpeed: function (v) {
+            var av = tizenAvplay();
+            if (backend() !== 'tizen' || !av || typeof av.setSpeed !== 'function') return false;
+            try { av.setSpeed(v); return true; } catch (e) { log(TAG, 'setSpeed failed', e && e.message); return false; }
+        }
     };
 })();

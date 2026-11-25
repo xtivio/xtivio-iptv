@@ -640,6 +640,18 @@
                             </div>
                         </div>
                         <div class="setting-row">
+                            <div class="setting-label"><span data-i18n="ui_keyboard_layout">Keyboard Layout</span><div class="setting-desc" data-i18n="ui_keyboard_layout_desc">Letters on the on-screen keyboard. Auto follows the app language. The layout key on the keyboard switches to English and back. A Bluetooth or USB keyboard types straight into the field using its own layout.</div></div>
+                            <div class="setting-ctl">
+                                <button class="field focusable" id="setKeyboardLayout" data-focus-key="set-keyboard-layout" tabindex="-1"></button>
+                            </div>
+                        </div>
+                        <div class="setting-row" id="setBackupRow" style="display:none">
+                            <div class="setting-label"><span data-i18n="bk_title">Backup &amp; Restore</span><div class="setting-desc" data-i18n="bk_row_desc">Save playlists, favourites, history and settings to a file, or restore them from one.</div></div>
+                            <div class="setting-ctl">
+                                <button class="field focusable" id="setBackup" data-focus-key="set-backup" tabindex="-1"></button>
+                            </div>
+                        </div>
+                        <div class="setting-row">
                             <div class="setting-label"><span data-i18n="ui_text_size">Text Size</span><div class="setting-desc" data-i18n="ui_scale_everything_in_the_app_up">Scale everything in the app up or down for easier reading. Affects channel lists, the guide, settings, and the on-screen keyboard. Video playback is not affected.</div></div>
                             <div class="setting-ctl">
                                 <select class="field focusable" id="setTextSize" data-focus-key="set-text-size">
@@ -734,6 +746,15 @@
                             </div>
                         </div>
                         <div class="setting-row">
+                            <div class="setting-label"><span data-i18n="live_logos">Channel Logos in List View</span><div class="setting-desc" data-i18n="live_logos_desc">Show each channel logo above its number in the Live TV list. Off keeps the list lightest on slow devices.</div></div>
+                            <div class="setting-ctl">
+                                <select class="field focusable" id="setLiveLogos" data-focus-key="set-live-logos">
+                                    <option value="off" data-i18n="ui_off">Off</option>
+                                    <option value="on" data-i18n="ui_on">On</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="setting-row">
                             <div class="setting-label"><span data-i18n="ui_info_overlay_duration">Info Overlay Duration</span><div class="setting-desc" data-i18n="ui_info_overlay_desc">How long the channel and programme info bar stays on screen after you change channels. Choose Always to keep it visible.</div></div>
                             <div class="setting-ctl">
                                 <select class="field focusable" id="setOverlay" data-focus-key="set-overlay">
@@ -769,6 +790,15 @@
                                 <select class="field focusable" id="setAutoResume" data-focus-key="set-autoresume">
                                     <option value="off" data-i18n="ui_off">Off</option>
                                     <option value="on" data-i18n="ui_on">On</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="setting-row">
+                            <div class="setting-label"><span data-i18n="sp_all_pl">Sports From All Playlists</span><div class="setting-desc" data-i18n="sp_all_pl_desc">Look for sports channels in your other playlists too, using their saved channel lists and guides. Turn off on slow devices.</div></div>
+                            <div class="setting-ctl">
+                                <select class="field focusable" id="setSportsAllPl" data-focus-key="set-sports-allpl">
+                                    <option value="on" data-i18n="ui_on">On</option>
+                                    <option value="off" data-i18n="ui_off">Off</option>
                                 </select>
                             </div>
                         </div>
@@ -811,7 +841,7 @@
                         </div>
                         <div class="setting-row">
                             <div class="setting-label" data-i18n="ui_app_version">App Version</div>
-                            <div class="setting-ctl"><span class="mono" id="appVerVal">1.0.12</span></div>
+                            <div class="setting-ctl"><span class="mono" id="appVerVal">1.0.13</span></div>
                         </div>
                         <div class="setting-row init-hidden" id="updateRow">
                             <div class="setting-label"><span data-i18n="ui_update_check">Check for Updates</span><div class="setting-desc" id="updateDesc"></div></div>
@@ -1151,6 +1181,8 @@
     <script type="text/javascript" src="assets/js/imageloader.js"></script>
     <script type="text/javascript" src="assets/js/ui.js"></script>
     <script type="text/javascript" src="assets/js/ui-modal.js"></script>
+    <script type="text/javascript" src="assets/js/backup.js"></script>
+    <script type="text/javascript" src="assets/js/backup-ui.js"></script>
     <script type="text/javascript" src="assets/js/app-parental.js"></script>
     <script type="text/javascript" src="assets/js/sports.js"></script>
     <script type="text/javascript" src="assets/js/catchup.js"></script>

@@ -5,6 +5,25 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
 
+    <!-- Backup and Restore on Android 9 and older only: plain access to Download/Xtivio. Newer Android uses the
+         file picker or MediaStore and needs no permission (All files access is added in the DIRECT build only). -->
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="28" />
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="28" />
+
+    <!-- Backup and Restore: lets the app see whether the device has a system file picker (package visibility). -->
+    <queries>
+        <intent>
+            <action android:name="android.intent.action.OPEN_DOCUMENT" />
+            <category android:name="android.intent.category.OPENABLE" />
+            <data android:mimeType="*/*" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.CREATE_DOCUMENT" />
+            <category android:name="android.intent.category.OPENABLE" />
+            <data android:mimeType="application/json" />
+        </intent>
+    </queries>
+
     <!-- TV apps must NOT require a touchscreen. Declaring it not-required is
          what makes the app installable on (and surfaced by) Android TV /
          Google TV devices, which have no touchscreen. -->

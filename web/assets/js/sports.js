@@ -26,8 +26,8 @@ var Sports = (function () {
     function retryDelay(n) { return Math.round((n < 3 ? 4000 : n < 8 ? 8000 : 15000) * cfg.retryScale); }
     var MATCH_DAYS = 2;            // EPG matching for today and tomorrow only
     var LEAGUE_MAX = 40;           // most-active leagues listed per sport in the filter
-    var MAX_CANDIDATES = 600;      // sports-looking channels scanned
-    var SPORTS_CH_RE = /sport|espn|bein|dazn|eurosport|sky\s?sp|bt\s?sp|\btnt\b|nbc\s?sp|cbs\s?sp|fox\s?sp|supersport|kayo|foxtel|optus|\btsn\b|sportsnet|setanta|premier|\bnfl\b|\bnba\b|\bmlb\b|\bnhl\b|\bufc\b|\bwwe\b|\bf1\b|formula|golf|tennis|cricket|rugby|racing|football|soccer|fight|boxing|arena|\bmatch\b|laliga|bundesliga|serie\s?a|ligue|mls|afl|nrl|motogp|nascar/i;
+    var MAX_CANDIDATES = 900;      // sports-looking channels scanned
+    var SPORTS_CH_RE = /sport|espn|bein|dazn|eurosport|sky\s?sp|bt\s?sp|\btnt\b|nbc\s?sp|cbs\s?sp|fox\s?sp|supersport|kayo|foxtel|optus|\btsn\b|sportsnet|setanta|premier|\bnfl\b|\bnba\b|\bmlb\b|\bnhl\b|\bufc\b|\bwwe\b|\bf1\b|formula|golf|tennis|cricket|rugby|racing|football|soccer|fight|boxing|arena|\bmatch\b|laliga|bundesliga|serie\s?a|ligue|mls|afl|nrl|motogp|nascar|\bfoot\b|futbol|calcio|fu[s\u00df]+ball|canal\s?(\+|plus)|\brmc\b|[e\u00e9]quipe|movistar|viaplay|ziggo|prime video|\bliga\b|uefa|champions|fifa|\bcopa\b|magenta/i;
 
     var state = {
         loaded: false, loading: false, error: '', partial: false, updatedAt: 0,
@@ -197,10 +197,66 @@ var Sports = (function () {
         try { s = s.normalize ? s.normalize('NFD').replace(/[̀-ͯ]/g, '') : s; } catch (e) {}
         return s.replace(/&/g, ' and ').replace(/[^a-z0-9 ]+/g, ' ').replace(/\s+/g, ' ').replace(/^ | $/g, '');
     }
+
+    /* The feed names teams in English ("FC Cologne", "Bayern Munich") while guides name them in
+     * their own language ("FC Koeln"/"FC Köln", "Bayern München"). Both sides go through
+     * mnorm(), which maps known variants to one form, so they still meet. Keys are already
+     * norm()-ed (lower case, no accents, single spaces). */
+    var ALIASES = {
+        'bayern munich': 'bayern', 'bayern munchen': 'bayern', 'bayern muenchen': 'bayern', 'lazio rome': 'lazio', 'juventus turin': 'juventus',
+        'racing club de lens': 'lens', 'rc lens': 'lens', 'strasbourg alsace': 'strasbourg', 'stade brest 29': 'brest', 'stade rennais': 'rennes', 'hamburger sv': 'hamburg', 'hsv': 'hamburg',
+        'cologne': 'koln', 'koeln': 'koln', 'munchen': 'munich', 'muenchen': 'munich', 'nurnberg': 'nuremberg', 'nuernberg': 'nuremberg',
+        'monchengladbach': 'gladbach', 'm gladbach': 'gladbach', 'moenchengladbach': 'gladbach', 'bayer 04 leverkusen': 'leverkusen', 'bayer leverkusen': 'leverkusen',
+        'rasenballsport leipzig': 'leipzig', 'rb leipzig': 'leipzig', 'eintracht frankfurt': 'frankfurt', 'dusseldorf': 'dusseldorf', 'duesseldorf': 'dusseldorf',
+        'internazionale': 'inter', 'inter milan': 'inter', 'inter milano': 'inter', 'milano': 'milan', 'torino': 'turin',
+        'paris saint germain': 'psg', 'paris sg': 'psg', 'paris st germain': 'psg', 'olympique marseille': 'marseille', 'olympique de marseille': 'marseille',
+        'olympique lyonnais': 'lyon', 'olympique lyon': 'lyon', 'as monaco': 'monaco',
+        'man utd': 'manchester united', 'man united': 'manchester united', 'man city': 'manchester city', 'spurs': 'tottenham', 'tottenham hotspur': 'tottenham',
+        'wolverhampton wanderers': 'wolves', 'wolverhampton': 'wolves', 'atletico de madrid': 'atletico madrid', 'atl madrid': 'atletico madrid', 'club atletico de madrid': 'atletico madrid',
+        'sporting cp': 'sporting', 'sporting lisbon': 'sporting', 'sporting lisboa': 'sporting', 'sporting clube de portugal': 'sporting',
+        'deutschland': 'germany', 'allemagne': 'germany', 'alemania': 'germany', 'germania': 'germany',
+        'espana': 'spain', 'espagne': 'spain', 'spanien': 'spain', 'spagna': 'spain',
+        'italia': 'italy', 'italie': 'italy', 'italien': 'italy', 'frankreich': 'france', 'francia': 'france',
+        'niederlande': 'netherlands', 'holland': 'netherlands', 'pays bas': 'netherlands', 'paesi bassi': 'netherlands', 'paises bajos': 'netherlands',
+        'brasil': 'brazil', 'bresil': 'brazil', 'brasilien': 'brazil', 'angleterre': 'england', 'inghilterra': 'england', 'inglaterra': 'england',
+        'belgique': 'belgium', 'belgien': 'belgium', 'belgica': 'belgium', 'suisse': 'switzerland', 'schweiz': 'switzerland', 'svizzera': 'switzerland', 'suiza': 'switzerland',
+        'etats unis': 'usa', 'united states': 'usa', 'estados unidos': 'usa', 'maroc': 'morocco', 'marruecos': 'morocco',
+        'croatie': 'croatia', 'kroatien': 'croatia', 'japon': 'japan', 'giappone': 'japan', 'autriche': 'austria', 'osterreich': 'austria', 'oesterreich': 'austria',
+        'ecosse': 'scotland', 'schottland': 'scotland', 'pays de galles': 'wales', 'turquie': 'turkey', 'turkiye': 'turkey', 'turkei': 'turkey',
+        'pologne': 'poland', 'polen': 'poland', 'danemark': 'denmark', 'suede': 'sweden', 'schweden': 'sweden', 'norvege': 'norway', 'norwegen': 'norway',
+        'tschechien': 'czech republic', 'republique tcheque': 'czech republic', 'coree du sud': 'south korea', 'sudkorea': 'south korea'
+    };
+    var ALIAS_RE = (function () {
+        var ks = [];
+        for (var k in ALIASES) if (ALIASES.hasOwnProperty(k)) ks.push(k);
+        ks.sort(function (a, b) { return b.length - a.length; });       // longest variant wins
+        return new RegExp(' (' + ks.join('|') + ')(?= )', 'g');
+    })();
+    function mnorm(s) {
+        var n = norm(s);
+        if (!n) return n;
+        return (' ' + n + ' ').replace(ALIAS_RE, function (m, k) { return ' ' + ALIASES[k]; }).replace(/^ | $/g, '');
+    }
+    /* Keys a channel may be looked up under in the guide: its ids first, then its name (the guide
+     * also resolves a display name), plain and without prefix / quality tags ("FR| Canal+ Foot HD"). */
+    function cleanName(n) {
+        n = String(n || '').replace(/\[[^\]]*\]|\([^)]*\)/g, ' ').replace(/^\s*[A-Za-z]{2,5}\s*[|:]\s*/, '');
+        n = n.replace(/\b(FHD|UHD|HEVC|H\.?26[45]|RAW|4K|HD|SD)\b/gi, ' ').replace(/\s+/g, ' ').replace(/^ | $/g, '');
+        return n;
+    }
+    function epgKeys(ch) {
+        var raw = [ch.tvgId, ch.epgId, ch.xmltvId, ch.name, cleanName(ch.name)], out = [], seen = {};
+        for (var i = 0; i < raw.length; i++) {
+            var k = raw[i] ? String(raw[i]) : '';
+            if (k.length < 2 || seen[k]) continue;
+            seen[k] = 1; out.push(k);
+        }
+        return out;
+    }
     function teamHit(ev, team) {
-        var t = norm(team);
+        var t = mnorm(team);
         if (!t) return false;
-        return norm(ev.home + ' ' + ev.away + ' ' + ev.title).indexOf(t) >= 0;
+        return mnorm(ev.home + ' ' + ev.away + ' ' + ev.title).indexOf(t) >= 0;
     }
     function passes(ev) {
         if (state.prefs.mode !== 'mine') return true;
@@ -260,7 +316,7 @@ var Sports = (function () {
         return st.length ? st : all;
     }
     var candCache = { src: null, n: -1, list: [] };
-    function candidateChannels() {
+    function activeCandidates() {
         var all = allChannels();
         // The scan runs a long regular expression over every channel (tens of thousands), so keep
         // the answer for as long as the channel list is the same one.
@@ -269,26 +325,105 @@ var Sports = (function () {
         for (var i = 0; i < all.length && out.length < MAX_CANDIDATES; i++) {
             var ch = all[i];
             if (!isLiveCh(ch)) continue;
-            if (!(ch.tvgId || ch.epgId || ch.xmltvId)) continue;
             if (SPORTS_CH_RE.test((ch.name || '') + ' ' + (ch.category || ''))) out.push(ch);
         }
         candCache = { src: all, n: all.length, list: out };
         return out;
     }
+    /* ---- Other playlists ----
+     * Sports also looks at the channels of the playlists that are not active, so an event is found on whichever
+     * playlist carries it (the active playlist is listed first and wins ties). Each saved channel list is read from
+     * the database ONE AT A TIME, reduced to its sports-looking and fixture-named live channels, and dropped again:
+     * only those few hundred channels per playlist stay in memory. A Stalker playlist counts too once it has loaded
+     * its whole channel list (that list is saved); playlists with Live TV switched off are skipped. Setting:
+     * Settings > Sports from all playlists. */
+    var XT_MAX_PL = 4, XT_TTL_MS = 15 * 60 * 1000;
+    var xt = { map: {}, token: 0, busy: false };
+    function allPlaylistsOn() {
+        try { var st = Store.getSettings(); return !st || st.sportsAllPl !== 'off'; } catch (e) { return true; }
+    }
+    function otherPlaylists() {
+        var out = [], pls = [], act = '';
+        if (!allPlaylistsOn()) return out;
+        try { pls = Store.getPlaylists() || []; act = Store.getActivePlaylistId(); } catch (e) {}
+        for (var i = 0; i < pls.length && out.length < XT_MAX_PL; i++) {
+            var pl = pls[i];
+            if (!pl || !pl.id || pl.id === act) continue;
+            var ct = { live: true };
+            try { ct = Store.getPlaylistContentTypes(pl.id) || ct; } catch (e2) {}
+            if (ct.live === false) continue;
+            out.push(pl);
+        }
+        return out;
+    }
+    function fixtureName(nm) { return /\s(vs\.?|v|@|x)\s|\s-\s/i.test(nm) && /[a-z]{3}/i.test(nm); }
+    function reduceList(list, pid) {
+        var cands = [], evch = [];
+        for (var i = 0; i < list.length; i++) {
+            var ch = list[i];
+            if (!ch || !isLiveCh(ch)) continue;
+            var nm = ch.name || '';
+            if (cands.length < MAX_CANDIDATES && SPORTS_CH_RE.test(nm + ' ' + (ch.category || ''))) { if (!ch.playlistId) ch.playlistId = pid; cands.push(ch); }
+            if (evch.length < MAX_CANDIDATES && fixtureName(nm)) { if (!ch.playlistId) ch.playlistId = pid; evch.push({ ch: ch, text: mnorm(nm) }); }
+        }
+        return { at: Date.now(), cands: cands, evch: evch };
+    }
+    /* Loads (or refreshes) the other playlists' sports channels and their saved guides, then calls done(changed).
+     * Safe to call repeatedly: fresh entries are reused, and a newer call replaces an older one. */
+    function loadExtras(done) {
+        var pls = otherPlaylists(), keep = {}, i;
+        for (i = 0; i < pls.length; i++) keep[pls[i].id] = 1;
+        for (var k in xt.map) if (xt.map.hasOwnProperty(k) && !keep[k]) delete xt.map[k];
+        var todo = [];
+        for (i = 0; i < pls.length; i++) {
+            var e = xt.map[pls[i].id];
+            if (!e || Date.now() - e.at > XT_TTL_MS) todo.push(pls[i]);
+        }
+        if (!todo.length || !window.Store || !Store.readCachedChannelsAsync) { done(false); return; }
+        var tok = ++xt.token, n = 0, changed = false;
+        xt.busy = true;
+        function next() {
+            if (tok !== xt.token) return;                       // a newer call took over
+            if (n >= todo.length) { xt.busy = false; done(changed); return; }
+            var pl = todo[n++];
+            Store.readCachedChannelsAsync(pl.id).then(function (list) {
+                if (tok !== xt.token) return;
+                if (list && list.length) { xt.map[pl.id] = reduceList(list, pl.id); changed = true; }
+                list = null;
+                var g = (window.Epg && Epg.loadCached) ? Epg.loadCached(pl.id) : Promise.resolve(false);
+                return g.then(function () { setTimeout(next, 0); });
+            })['catch'](function () { setTimeout(next, 0); });
+        }
+        next();
+    }
+    function extraCandidates() {
+        var out = [], pls = otherPlaylists();
+        for (var i = 0; i < pls.length; i++) { var e = xt.map[pls[i].id]; if (e) out = out.concat(e.cands); }
+        return out;
+    }
+    function candidateChannels() {
+        var a = activeCandidates(), x = extraCandidates();
+        return x.length ? a.concat(x) : a;
+    }
     /* Event channels: some providers publish one channel per game ("NBA 03: Lakers vs Celtics"),
      * with no EPG at all. Those are matched on the channel NAME. Only names that look like a
      * fixture (vs / v / @ / -) are kept, and the normalised names are cached per channel list. */
     var evCache = { src: null, n: -1, list: [] };
-    function eventChannels() {
+    function activeEventChannels() {
         var all = allChannels();
         if (evCache.src === all && evCache.n === all.length) return evCache.list;
         var out = [];
         for (var i = 0; i < all.length; i++) {
             var ch = all[i], nm = ch.name || '';
             if (!isLiveCh(ch)) continue;
-            if (/\s(vs\.?|v|@|x)\s|\s-\s/i.test(nm) && /[a-z]{3}/i.test(nm)) out.push({ ch: ch, text: norm(nm) });
+            if (fixtureName(nm)) out.push({ ch: ch, text: mnorm(nm) });
         }
         evCache = { src: all, n: all.length, list: out };
+        return out;
+    }
+    function eventChannels() {
+        var a = activeEventChannels(), out = a, pls = otherPlaylists();
+        for (var i = 0; i < pls.length; i++) { var e = xt.map[pls[i].id]; if (e && e.evch.length) out = out === a ? a.concat(e.evch) : out.concat(e.evch); }
         return out;
     }
     function nameMatches(ev, evch) {
@@ -300,18 +435,26 @@ var Sports = (function () {
         return out;
     }
     function sigToks(name) {
-        var t = norm(name).split(' '), out = [];
+        var t = mnorm(name).split(' '), out = [];
         for (var i = 0; i < t.length; i++) {
-            if (t[i].length >= 3 && !/^(fc|afc|cf|sc|the|and|vs|club|city2)$/.test(t[i])) out.push(t[i]);
+            if (t[i].length >= 3 && !/^(fc|afc|cf|sc|the|and|vs|club|city2|osc|sco|ogc|ssc|cfc|fsv|tsg|vfb|vfl|ssd|usd|rcd|calcio)$/.test(t[i])) out.push(t[i]);
         }
         return out;
     }
     function nameIn(text, name) {
-        var n = norm(name);
+        var n = mnorm(name);
         if (!n) return false;
         if (text.indexOf(n) >= 0) return true;
-        var toks = sigToks(name);                       // "Manchester United" ~ "Man United" via last token
+        var toks = sigToks(name);
+        // One distinctive word ("FC Koln" -> koln, "Arsenal FC" -> arsenal) is enough when the guide drops the FC.
+        if (toks.length === 1 && toks[0].length >= 4 && !/^(united|city|town|real|athletic|sporting|county|albion|rovers|wanderers|dynamo|sport|club)$/.test(toks[0]) &&
+            (' ' + text + ' ').indexOf(' ' + toks[0] + ' ') >= 0) return true;                       // "Manchester United" ~ "Man United" via last token
         if (toks.length >= 2 && text.indexOf(toks[toks.length - 1]) >= 0 && text.indexOf(toks[0].slice(0, 3)) >= 0) return true;
+        // "Carlisle United" ~ "Carlisle", "Aldershot Town" ~ "Aldershot": a two-word name ending in a club suffix matches on its
+        // first word, except where a city has two clubs (Manchester, Sheffield, Dundee...) or the word is generic.
+        if (toks.length === 2 && toks[0].length >= 4 && /^(united|town|city|rovers|moors|harriers|athletic|albion|county|wanderers|borough|argyle|stanley|orient|villa|dons|saints|spartans|stars)$/.test(toks[1]) &&
+            !/^(manchester|sheffield|bristol|nottingham|birmingham|london|newcastle|dundee|oxford|cambridge|liverpool|glasgow|milan|real|west|north|south|east|inter|olympic|sporting|atletico|athletic|dynamo|spartak|central|royal|union|racing|city|town|united|county|forest)$/.test(toks[0]) &&
+            (' ' + text + ' ').indexOf(' ' + toks[0] + ' ') >= 0) return true;
         // "Los Angeles Lakers" ~ "Lakers": a distinctive last word is enough ("United"/"City" are not).
         var last = toks[toks.length - 1];
         if (toks.length >= 2 && last && last.length >= 5 && !/^(united|city|town|rovers|wanderers|athletic|county|albion|hotspur|rangers|county|stars|kings)$/.test(last) &&
@@ -326,25 +469,24 @@ var Sports = (function () {
             if (s === 1 && nameIn(text, ev.league)) s = 2;   // "Premier League: Arsenal" on a one-team title
             return s;
         }
-        var t = norm(ev.title);
+        var t = mnorm(ev.title);
         if (t && text.indexOf(t) >= 0) return 2;
-        var lg = norm(ev.league);
+        var lg = mnorm(ev.league);
         if (lg && text.indexOf(lg) >= 0) return 1;
         return 0;
     }
     /* Programmes of one candidate channel for the viewed day, fetched once per matching run (not
      * once per event) with their titles already normalised. */
     function dayProgs(ch, run) {
-        var key = (ch.playlistId || '') + '|' + (ch.tvgId || ch.epgId || '') + '|' + (ch.xmltvId || '');
+        var keys = epgKeys(ch), key = (ch.playlistId || '') + '|' + keys.join('|');
         var hit = run.cache[key];
         if (hit) return hit;
         var pid = ch.playlistId || Store.getActivePlaylistId(), progs = [];
         try {
-            progs = Epg.getProgrammesBetween(pid, ch.tvgId || ch.epgId, run.a, run.b) || [];
-            if (!progs.length && ch.xmltvId) progs = Epg.getProgrammesBetween(pid, ch.xmltvId, run.a, run.b) || [];
+            for (var q = 0; q < keys.length && !progs.length; q++) progs = Epg.getProgrammesBetween(pid, keys[q], run.a, run.b) || [];
         } catch (e) { progs = []; }
         var nt = [];
-        for (var k = 0; k < progs.length; k++) nt.push(norm(progs[k].title));
+        for (var k = 0; k < progs.length; k++) nt.push(mnorm(progs[k].title));
         hit = run.cache[key] = { progs: progs, nt: nt };
         return hit;
     }
@@ -404,16 +546,21 @@ var Sports = (function () {
         while ((t = state.scanTimers.pop())) clearTimeout(t);
         if (state.day >= MATCH_DAYS || !window.Epg || !Epg.prefetchChannels) return;
         if (playlistBusy()) { waitForPlaylist(); return; }
+        // Other playlists' sports channels load in the background; when they land, matching runs again with them.
+        if (!xt.busy) loadExtras(function (changed) { if (changed && isActive()) scheduleMatching(); });
         var cands = candidateChannels();
         if (!cands.length) return;
         var byPl = {}, i;
         for (i = 0; i < cands.length; i++) {
             var pid = cands[i].playlistId || Store.getActivePlaylistId();
-            (byPl[pid] = byPl[pid] || []).push(cands[i].tvgId || cands[i].epgId);
+            // Only real ids are preloaded; a channel found by name resolves to its id on the first lookup,
+            // which loads it in the background (the timers below pick it up).
+            var ids = [cands[i].tvgId || cands[i].epgId, cands[i].xmltvId], list = (byPl[pid] = byPl[pid] || []);
+            for (var kk = 0; kk < ids.length; kk++) if (ids[kk]) list.push(ids[kk]);
         }
         for (var p in byPl) if (byPl.hasOwnProperty(p)) { try { Epg.prefetchChannels(p, byPl[p]); } catch (e) {} }
         // EPG lists load asynchronously from IndexedDB: recompute as they land.
-        var delays = [250, 1200, 3500];
+        var delays = [250, 1200, 3500, 9000];
         for (i = 0; i < delays.length; i++) {
             state.scanTimers.push(setTimeout(function () {
                 if (!isActive()) return;
@@ -635,7 +782,9 @@ var Sports = (function () {
         var items = [], acts = [], i;
         for (i = 0; i < m.length; i++) {
             (function (hit) {
-                items.push('▶ ' + hit.ch.name + (hit.prog && hit.prog.title ? '  —  ' + hit.prog.title : ''));
+                var actId = ''; try { actId = Store.getActivePlaylistId(); } catch (eA) {}
+                var other = (hit.ch.playlistId && hit.ch.playlistId !== actId && hit.ch.playlistName) ? '  [' + hit.ch.playlistName + ']' : '';
+                items.push('▶ ' + hit.ch.name + other + (hit.prog && hit.prog.title ? '  —  ' + hit.prog.title : ''));
                 acts.push(function () { try { UI.tryPlay(hit.ch); } catch (e) {} });
             })(m[i]);
         }
@@ -964,6 +1113,6 @@ var Sports = (function () {
 
     return {
         enter: enter, nav: nav, render: render, load: load, indexingDone: indexingDone,
-        _state: state, _cfg: cfg, _norm: norm, _progScore: progScore, _passes: passes
+        _state: state, _cfg: cfg, _norm: norm, _mnorm: mnorm, _nameIn: nameIn, _epgKeys: epgKeys, _progScore: progScore, _passes: passes, _chRe: SPORTS_CH_RE, _loadExtras: loadExtras, _candidates: candidateChannels, _eventChannels: eventChannels, _xt: xt
     };
 })();

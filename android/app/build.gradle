@@ -38,7 +38,7 @@ plugins {
  *                the output filename, and what config.js's INSTALL_TOKEN
  *                must match exactly (checked by version-bump-check.py).
  */
-def xtivioVersion = "1.0.12"                         // <-- bump the PATCH number at each real release
+def xtivioVersion = "1.0.13"                         // <-- bump the PATCH number at each real release
 def xtivioInternalBuild = 9                        // <-- bump 0-9 per delta within one release cycle
 def xtivioVersionParts = xtivioVersion.tokenize('.').collect { it.toInteger() }
 def xtivioVersionCode = xtivioVersionParts[0] * 1000000 + xtivioVersionParts[1] * 10000 + xtivioVersionParts[2] * 100 + xtivioInternalBuild

@@ -1127,14 +1127,108 @@
     // the omitted-letter point to fix a typo.
     var vkCursorPos = 0;
 
-    var VK_LAYOUT_ALPHA = [
-        ['1','2','3','4','5','6','7','8','9','0','BACK'],
-        ['q','w','e','r','t','y','u','i','o','p','CLEAR'],
-        ['a','s','d','f','g','h','j','k','l','@','PREV'],
-        ['z','x','c','v','b','n','m','.','-','_', 'NEXT'],
-        // LEFT/RIGHT inserted around SPACE for cursor movement
-        ['CAPS','SYM','LEFT','SPACE','RIGHT','DONE']
-    ];
+    /* ---- Letter layouts ----
+     * One entry per layout: three rows of letters (the digit row above them is shared), an optional
+     * page of accented / extra characters (acc, reached with the ACC key) and nocase for scripts with
+     * no capitals. Rows shorter than the widest row are padded with punctuation, so every layout keeps
+     * the "." "-" "_" "@" keys the URL and login fields need. The app language picks the layout
+     * (Settings > Keyboard Layout = Auto); the layout key switches to English and back. */
+    var VK_QWERTY = ['qwertyuiop', 'asdfghjkl@', 'zxcvbnm.-_'];
+    var VK_AZERTY = ['azertyuiop', 'qsdfghjklm', 'wxcvbn.-_@'];
+    var VK_QWERTZ = ['qwertzuiop', 'asdfghjkl@', 'yxcvbnm.-_'];
+    var VK_LAYOUTS = {
+        'en': { name: 'English (QWERTY)', rows: VK_QWERTY, acc: '' },
+        'fr': { name: 'Fran\u00e7ais (AZERTY)', rows: VK_AZERTY, acc: '\u00e9\u00e8\u00ea\u00eb\u00e0\u00e2\u00f9\u00fb\u00fc\u00ef\u00ee\u00f4\u00f6\u00e7\u0153\u00e6\u00ff' },
+        'de': { name: 'Deutsch (QWERTZ)', rows: VK_QWERTZ, acc: '\u00e4\u00f6\u00fc\u00df' },
+        'es': { name: 'Espa\u00f1ol (QWERTY)', rows: VK_QWERTY, acc: '\u00f1\u00e1\u00e9\u00ed\u00f3\u00fa\u00fc\u00bf\u00a1' },
+        'it': { name: 'Italiano (QWERTY)', rows: VK_QWERTY, acc: '\u00e0\u00e8\u00e9\u00ec\u00f2\u00f3\u00f9' },
+        'pt': { name: 'Portugu\u00eas (QWERTY)', rows: VK_QWERTY, acc: '\u00e3\u00f5\u00e1\u00e2\u00e0\u00e9\u00ea\u00ed\u00f3\u00f4\u00fa\u00fc\u00e7' },
+        'nl': { name: 'Nederlands (QWERTY)', rows: VK_QWERTY, acc: '\u00e9\u00e8\u00eb\u00ef\u00f6\u00fc\u00e1\u00ed\u00f3\u00fa' },
+        'sv': { name: 'Svenska (QWERTY)', rows: VK_QWERTY, acc: '\u00e5\u00e4\u00f6\u00e9\u00fc\u00e8' },
+        'no': { name: 'Norsk (QWERTY)', rows: VK_QWERTY, acc: '\u00e6\u00f8\u00e5\u00e9\u00e8\u00ea\u00f3\u00f2\u00e2' },
+        'da': { name: 'Dansk (QWERTY)', rows: VK_QWERTY, acc: '\u00e6\u00f8\u00e5\u00e9\u00fc' },
+        'pl': { name: 'Polski (QWERTY)', rows: VK_QWERTY, acc: '\u0105\u0107\u0119\u0142\u0144\u00f3\u015b\u017a\u017c' },
+        'cs': { name: '\u010ce\u0161tina (QWERTZ)', rows: VK_QWERTZ, acc: '\u00e1\u010d\u010f\u00e9\u011b\u00ed\u0148\u00f3\u0159\u0161\u0165\u00fa\u016f\u00fd\u017e' },
+        'hu': { name: 'Magyar (QWERTZ)', rows: VK_QWERTZ, acc: '\u00e1\u00e9\u00ed\u00f3\u00f6\u0151\u00fa\u00fc\u0171' },
+        'ro': { name: 'Rom\u00e2n\u0103 (QWERTY)', rows: VK_QWERTY, acc: '\u0103\u00e2\u00ee\u0219\u021b\u015f\u0163' },
+        'tr': { name: 'T\u00fcrk\u00e7e (QWERTY)', rows: VK_QWERTY, acc: '\u00e7\u011f\u0131\u00f6\u015f\u00fc\u00e2\u00ee' },
+        'sq': { name: 'Shqip (QWERTY)', rows: VK_QWERTY, acc: '\u00eb\u00e7' },
+        'el': { name: '\u0395\u03bb\u03bb\u03b7\u03bd\u03b9\u03ba\u03ac', rows: [';\u03c2\u03b5\u03c1\u03c4\u03c5\u03b8\u03b9\u03bf\u03c0', '\u03b1\u03c3\u03b4\u03c6\u03b3\u03b7\u03be\u03ba\u03bb@', '\u03b6\u03c7\u03c8\u03c9\u03b2\u03bd\u03bc.-_'], acc: '\u03ac\u03ad\u03ae\u03af\u03cc\u03cd\u03ce\u03ca\u03cb\u0390\u03b0' },
+        'ru': { name: '\u0420\u0443\u0441\u0441\u043a\u0438\u0439 (\u0419\u0426\u0423\u041a\u0415\u041d)', rows: ['\u0439\u0446\u0443\u043a\u0435\u043d\u0433\u0448\u0449\u0437\u0445\u044a', '\u0444\u044b\u0432\u0430\u043f\u0440\u043e\u043b\u0434\u0436\u044d\u0451', '\u044f\u0447\u0441\u043c\u0438\u0442\u044c\u0431\u044e'], acc: '' },
+        'bg': { name: '\u0411\u044a\u043b\u0433\u0430\u0440\u0441\u043a\u0438', rows: ['\u044f\u0432\u0435\u0440\u0442\u044a\u0443\u0438\u043e\u043f\u0448\u0449', '\u0430\u0441\u0434\u0444\u0433\u0445\u0439\u043a\u043b\u0447\u044e', '\u0437\u044c\u0446\u0436\u0431\u043d\u043c'], acc: '' },
+        'mk': { name: '\u041c\u0430\u043a\u0435\u0434\u043e\u043d\u0441\u043a\u0438', rows: ['\u0459\u045a\u0435\u0440\u0442\u0455\u0443\u0438\u043e\u043f\u0448\u0453', '\u0430\u0441\u0434\u0444\u0433\u0445\u0458\u043a\u043b\u0447\u045c\u0436', '\u0437\u045f\u0446\u0432\u0431\u043d\u043c'], acc: '' },
+        'sr': { name: '\u0421\u0440\u043f\u0441\u043a\u0438 (\u045b\u0438\u0440\u0438\u043b\u0438\u0446\u0430)', rows: ['\u0459\u045a\u0435\u0440\u0442\u0437\u0443\u0438\u043e\u043f\u0448\u0452', '\u0430\u0441\u0434\u0444\u0433\u0445\u0458\u043a\u043b\u0447\u045b\u0436', '\u0455\u045f\u0446\u0432\u0431\u043d\u043c'], acc: '' },
+        'sr-latn': { name: 'Srpski (latinica)', rows: VK_QWERTZ, acc: '\u010d\u0107\u0161\u0111\u017e' },
+        'ar': { name: '\u0627\u0644\u0639\u0631\u0628\u064a\u0629', rows: ['\u0636\u0635\u062b\u0642\u0641\u063a\u0639\u0647\u062e\u062d\u062c\u062f', '\u0634\u0633\u064a\u0628\u0644\u0627\u062a\u0646\u0645\u0643\u0637\u0630', '\u0626\u0621\u0624\u0631\u0649\u0629\u0648\u0632\u0638'], acc: '\u0623\u0625\u0622\u064b\u064c\u064d\u064e\u064f\u0650\u0651\u0652\u060c\u061b\u061f', nocase: true }
+    };
+    var VK_LAYOUT_ORDER = ['en', 'fr', 'de', 'es', 'it', 'pt', 'nl', 'sv', 'no', 'da', 'pl', 'cs', 'hu', 'ro', 'tr', 'sq', 'el', 'ru', 'bg', 'mk', 'sr', 'sr-latn', 'ar'];
+    var vkAlt = false;        // the layout key switched to English
+    var vkAccMode = false;    // the accents page is showing
+
+    /* Layout id from Settings (keyboardLayout), or from the app language when it is "auto". */
+    function vkMainId() {
+        var id = 'auto';
+        try { id = String((Store.getSettings() || {}).keyboardLayout || 'auto'); } catch (e) {}
+        if (id === 'auto' || !VK_LAYOUTS[id]) {
+            var lg = 'en';
+            try { lg = (window.I18n && I18n.getLanguage && I18n.getLanguage()) || 'en'; } catch (e2) {}
+            id = (lg === 'pt-BR') ? 'pt' : lg;
+            if (!VK_LAYOUTS[id]) id = 'en';
+        }
+        return id;
+    }
+    function vkCurId() { var m = vkMainId(); return (vkAlt && m !== 'en') ? 'en' : m; }
+    function vkCurDef() { return VK_LAYOUTS[vkCurId()] || VK_LAYOUTS.en; }
+    function vkLayoutWidth(def) {
+        var w = 10;
+        for (var i = 0; i < def.rows.length; i++) if (def.rows[i].length > w) w = def.rows[i].length;
+        return w;
+    }
+    function vkPadRow(chars, w, pool) {
+        var out = chars.slice(), seen = {}, k;
+        for (k = 0; k < out.length; k++) seen[out[k]] = 1;
+        for (k = 0; out.length < w && k < pool.length; k++) if (!seen[pool[k]]) out.push(pool[k]);
+        return out;
+    }
+    function vkTails(touch) {
+        return touch ? [['COPY', 'PASTE'], ['BACK', 'CLEAR'], ['PREV', 'NEXT'], ['DONE']] : [['BACK'], ['CLEAR'], ['PREV'], ['NEXT']];
+    }
+    function vkAlphaLayout(def, touch) {
+        var w = vkLayoutWidth(def), tails = vkTails(touch), pool = ['.', '-', '_', '@', ',', '/'];
+        var rows = [vkPadRow('1234567890'.split(''), w, ['@', ',', '.', '-', '_'])];
+        for (var i = 0; i < 3; i++) rows.push(vkPadRow(def.rows[i].split(''), w, pool));
+        for (var r = 0; r < 4; r++) rows[r] = rows[r].concat(tails[r]);
+        var b = [];
+        if (!def.nocase) b.push('CAPS');
+        b.push('SYM');
+        if (def.acc) b.push('ACC');
+        if (vkMainId() !== 'en') b.push('LANG');
+        b.push('LEFT', 'SPACE', 'RIGHT', touch ? 'SPACER' : 'DONE');
+        rows.push(b);
+        return rows;
+    }
+    function vkAccLayout(def, touch) {
+        var chars = def.acc.split(''), tails = vkTails(touch), rows = [];
+        for (var r = 0; r < 4; r++) {
+            var row = chars.slice(r * 10, r * 10 + 10);
+            while (row.length < 10) row.push('GAP');
+            rows.push(row.concat(tails[r]));
+        }
+        rows.push((def.nocase ? [] : ['CAPS']).concat(['ABC', 'LEFT', 'SPACE', 'RIGHT', touch ? 'SPACER' : 'DONE']));
+        return rows;
+    }
+    function vkLangCode() { return vkCurId().slice(0, 2).toUpperCase(); }
+    function vkAccLabel() { var a = vkCurDef().acc; return vkShow(a.charAt(0)) + (/[\u064B-\u0652]/.test(a.charAt(1)) ? '' : a.charAt(1)); }
+    /* Combining marks (Arabic vowel signs) are drawn on a dotted circle so they show on a key. */
+    function vkShow(ch) { return /^[\u0300-\u036F\u064B-\u0652]$/.test(ch) ? '\u25CC' + ch : ch; }
+    /* Capital form of a letter key. Turkish dotted/dotless i, and letters whose capital is longer
+     * (the German sharp s) are handled; anything else uses the plain upper case. */
+    function vkCase(ch) {
+        if (!vkIsCaps || ch.length !== 1) return ch;
+        if (vkCurId() === 'tr') { if (ch === 'i') return '\u0130'; if (ch === '\u0131') return 'I'; }
+        var u = ch.toUpperCase();
+        return u.length === 1 ? u : ch;
+    }
 
     var VK_LAYOUT_SYM = [
         ['!','@','#','$','%','^','&','*','(',')', 'BACK'],
@@ -1148,13 +1242,6 @@
      * (Copy|Paste, Del|Clear, Prev|Next) and Done becomes one double-height key
      * spanning the two rows below, so there are no gaps. SPACER keeps the bottom row
      * the same width as the rest (Done overhangs into it). TVs keep the layouts above. */
-    var VK_LAYOUT_ALPHA_T = [
-        ['1','2','3','4','5','6','7','8','9','0','COPY','PASTE'],
-        ['q','w','e','r','t','y','u','i','o','p','BACK','CLEAR'],
-        ['a','s','d','f','g','h','j','k','l','@','PREV','NEXT'],
-        ['z','x','c','v','b','n','m','.','-','_','DONE'],
-        ['CAPS','SYM','LEFT','SPACE','RIGHT','SPACER']
-    ];
     var VK_LAYOUT_SYM_T = [
         ['!','@','#','$','%','^','&','*','(',')','COPY','PASTE'],
         ['+','=','\\','|','[',']','{','}','<','>','BACK','CLEAR'],
@@ -1202,6 +1289,8 @@
             case 'ABC':   return 'ABC';
             case 'LEFT':  return '\u25C0';
             case 'RIGHT': return '\u25B6';
+            case 'LANG':  return vkLangCode();
+            case 'ACC':   return vkAccLabel();
         }
         return null;
     }
@@ -1262,13 +1351,17 @@
         updateVkPreview();
 
         var vkTouch = vkClipboardKeysWanted();
-        var layout = vkTouch ? (vkSymMode ? VK_LAYOUT_SYM_T : VK_LAYOUT_ALPHA_T)
-                             : (vkSymMode ? VK_LAYOUT_SYM : VK_LAYOUT_ALPHA);
+        var vkDef = vkCurDef();
+        var layout = vkSymMode ? (vkTouch ? VK_LAYOUT_SYM_T : VK_LAYOUT_SYM)
+                   : (vkAccMode && vkDef.acc) ? vkAccLayout(vkDef, vkTouch)
+                   : vkAlphaLayout(vkDef, vkTouch);
+        var vkPageW = (vkSymMode || vkAccMode) ? 10 : vkLayoutWidth(vkDef);
         for (var r = 0; r < layout.length; r++) {
             var row = el('div', { 'class': 'vk-row' });
             for (var c = 0; c < layout[r].length; c++) {
                 (function (ch) {
                     if (ch === 'SPACER') { row.appendChild(el('div', { 'class': 'vk-spacer' })); return; }
+                    if (ch === 'GAP') { row.appendChild(el('div', { 'class': 'vk-gap' })); return; }
                     var iconKey = vkTouch && VK_ICON_SVG[ch];
                     var cls = 'vk-key focusable';
                     /* CAPS, SYM, LEFT, RIGHT are now
@@ -1285,7 +1378,7 @@
                     // Protocol keys are longer than a normal key ("https://" is 8
                     // chars); give them a wider fixed width so the label fits.
                     else if (ch.indexOf('://') !== -1) cls += ' urlkey';
-                    var label = vkLabel(ch) || (vkIsCaps && ch.length === 1 ? ch.toUpperCase() : ch);
+                    var label = vkLabel(ch) || vkShow(vkCase(ch));
                     if (ch === 'CAPS' && vkCapsLock) label = 'A⇧ LOCK';
                     var key = el('div', {
                         'class': cls,
@@ -1310,6 +1403,17 @@
                             '<svg class="vk-tick" viewBox="0 0 16 16" aria-hidden="true">' +
                             '<path d="M3 8.5l3.2 3.2L13 4.8" fill="none" stroke="currentColor" ' +
                             'stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>');
+                    }
+                    if (ch === 'SPACE') {
+                        // Space fills what the other keys of its row leave, so the bottom row is as wide
+                        // as the letter rows whatever keys (ACC, LANG) share it. 448 is the stock width.
+                        var others = 0;
+                        for (var oi = 0; oi < layout[r].length; oi++) {
+                            var ok = layout[r][oi];
+                            if (ok !== 'SPACE' && ok !== 'DONE' && ok !== 'SPACER') others++;
+                        }
+                        var spPx = (vkPageW - others) * 76 - 8;
+                        if (spPx !== 448) key.style.width = 'calc(' + spPx + 'px * var(--ui-scale))';
                     }
                     key.addEventListener('click', function () { handleVKey(ch); });
                     row.appendChild(key);
@@ -1463,14 +1567,26 @@
             setTimeout(function () { if (window.Focus && Focus.focusKey) Focus.focusKey('vk-CAPS'); }, 50);
             return;
         }
+        if (ch === 'ACC') {
+            vkAccMode = true; vkSymMode = false;
+            buildVKeyboard();
+            setTimeout(function () { var vk = $('#vkeyboard'); if (vk) Focus.focusFirstIn(vk); }, 50);
+            return;
+        }
+        if (ch === 'LANG') {
+            vkAlt = !vkAlt; vkSymMode = false; vkAccMode = false;
+            buildVKeyboard();
+            setTimeout(function () { if (window.Focus && Focus.focusKey) Focus.focusKey('vk-LANG'); }, 50);
+            return;
+        }
         if (ch === 'SYM') {
-            vkSymMode = true;
+            vkSymMode = true; vkAccMode = false;
             buildVKeyboard();
             setTimeout(function () { var vk = $('#vkeyboard'); if (vk) Focus.focusFirstIn(vk); }, 50);
             return;
         }
         if (ch === 'ABC') {
-            vkSymMode = false;
+            vkSymMode = false; vkAccMode = false;
             buildVKeyboard();
             setTimeout(function () { var vk = $('#vkeyboard'); if (vk) Focus.focusFirstIn(vk); }, 50);
             return;
@@ -1516,7 +1632,7 @@
             navigateField(ch === 'NEXT' ? 1 : -1);
             return;
         }
-        var add = vkIsCaps && ch.length === 1 ? ch.toUpperCase() : ch;
+        var add = vkCase(ch);
         vkInsertAtCursor(add);
         if (vkIsCaps && !vkCapsLock && ch.length === 1) {
             vkIsCaps = false;
@@ -1752,6 +1868,7 @@
         // bar button) pass a visible element to avoid losing focus on Back.
         vkReturnFocus = returnFocusEl || null;
         vkShowPassword = false;
+        vkAccMode = false;
         // Cursor starts at end of current value. If the
         // underlying input has its own selection (e.g. user tapped mid-
         // string in a browser that respects selectionStart on readonly),
@@ -1776,7 +1893,7 @@
         if (Focus.pushScope) Focus.pushScope(vk);
         // pushScope focuses the first focusable (the '1' key); move straight to
         // 'q' here so the user never sees focus land on '1' first.
-        if (Focus.focusKey) Focus.focusKey('vk-q');
+        if (Focus.focusKey) Focus.focusKey('vk-' + (vkSymMode ? '!' : vkCurDef().rows[0].charAt(0)));
         // Scroll the target input into the visible area above the keyboard
         if (vkTarget) {
             setTimeout(function () {
@@ -1860,6 +1977,93 @@
         return false;
     }
 
+
+    /* ===== Physical (Bluetooth / USB) keyboard =====
+     * The search fields are read-only so the TV's own keyboard never opens, and Remote ignores
+     * letter keys, so a physical keyboard used to do nothing. Remote hands every keydown here
+     * first. With the on-screen keyboard open, printable keys type into its field (the character
+     * comes from the key event, so the keyboard's own layout and accents are respected) and
+     * Backspace deletes; with it closed, typing while a text field is focused opens it. The remote
+     * keeps working: arrows still move around, and Left/Right move the caret only for a few
+     * seconds after a physical key was typed. Returns true when the key was used. */
+    var vkPhysAt = 0;
+    function vkOpen() { var vk = $('#vkeyboard'); return !!(vk && !vk.classList.contains('hidden')); }
+    function vkFocusedField() {
+        var c = null, ty;
+        try { c = Focus.current ? Focus.current() : null; } catch (e) {}
+        if (!c || (c.tagName !== 'INPUT' && c.tagName !== 'TEXTAREA') || !c.hasAttribute('readonly')) return null;
+        ty = String(c.getAttribute('type') || 'text').toLowerCase();
+        return /^(text|search|url|email|password|tel|number)$/.test(ty) ? c : null;
+    }
+    function vkPhysicalKey(ev) {
+        if (!ev || ev.isComposing) return false;
+        var key = ev.key, open = vkOpen(), now = new Date().getTime();
+        if (ev.ctrlKey || ev.metaKey) {
+            if (open && vkTarget && (key === 'v' || key === 'V')) { ev.preventDefault(); vkPaste(); vkPhysAt = now; return true; }
+            if (open && vkTarget && (key === 'c' || key === 'C')) { ev.preventDefault(); vkCopy(); return true; }
+            return false;
+        }
+        var printable = typeof key === 'string' && key.length >= 1 && key.length <= 2 && key !== 'Dead' && (key.length === 1 || key.charCodeAt(0) >= 0xD800);
+        if (!open) {
+            var fld = printable ? vkFocusedField() : null;
+            if (!fld) return false;
+            openVKeyboard(fld);
+            if (!vkOpen()) return false;
+            open = true;
+        }
+        if (!vkTarget) return false;
+        if (printable) {
+            ev.preventDefault();
+            vkPhysAt = now;
+            vkInsertAtCursor(key);
+            fireInput(vkTarget); updateVkPreview();
+            return true;
+        }
+        var typedRecently = (now - vkPhysAt) < 8000;
+        if (key === 'Backspace') {
+            if (vkGetRawValue().length === 0) return false;            // empty field: Backspace stays "back"
+            ev.preventDefault(); vkPhysAt = now;
+            handleVKey('BACK');
+            return true;
+        }
+        if (key === 'Delete') {
+            vkClampCursor();
+            var raw = vkGetRawValue();
+            if (vkCursorPos >= raw.length) return false;
+            ev.preventDefault(); vkPhysAt = now;
+            vkSetRawValue(raw.slice(0, vkCursorPos) + raw.slice(vkCursorPos + 1));
+            fireInput(vkTarget); updateVkPreview();
+            return true;
+        }
+        if (key === 'Home' || key === 'End') {
+            ev.preventDefault(); vkCursorPos = key === 'Home' ? 0 : vkGetRawValue().length; vkClampCursor(); updateVkPreview();
+            return true;
+        }
+        if (typedRecently && (key === 'ArrowLeft' || key === 'ArrowRight')) {
+            ev.preventDefault(); vkPhysAt = now;
+            handleVKey(key === 'ArrowLeft' ? 'LEFT' : 'RIGHT');
+            return true;
+        }
+        if (typedRecently && key === 'Enter') {                         // Enter finishes typing, like Done
+            ev.preventDefault();
+            closeVKeyboard();
+            return true;
+        }
+        return false;
+    }
+    /* Settings > Keyboard Layout: the choices (Auto first) and the current one's name. */
+    function vkLayoutChoices() {
+        var out = [{ id: 'auto', name: T('ui_auto_recommended') }];
+        for (var i = 0; i < VK_LAYOUT_ORDER.length; i++) out.push({ id: VK_LAYOUT_ORDER[i], name: VK_LAYOUTS[VK_LAYOUT_ORDER[i]].name });
+        return out;
+    }
+    function vkLayoutLabel() {
+        var id = 'auto';
+        try { id = String((Store.getSettings() || {}).keyboardLayout || 'auto'); } catch (e) {}
+        if (id === 'auto' || !VK_LAYOUTS[id]) return T('ui_auto_recommended') + ' - ' + VK_LAYOUTS[vkMainId()].name;
+        return VK_LAYOUTS[id].name;
+    }
+
     UI.openListPicker = openListPicker;
     UI.openSubtitlePicker = openSubtitlePicker;
     UI.autoLoadSubtitlesForItem = autoLoadSubtitlesForItem;
@@ -1869,6 +2073,9 @@
     UI.toast = toast;
     UI.toastHide = toastHide;
     UI.toastIsSticky = function () { return toastSticky; };
+    UI.vkPhysicalKey = vkPhysicalKey;
+    UI.vkLayoutChoices = vkLayoutChoices;
+    UI.vkLayoutLabel = vkLayoutLabel;
     UI.openVKeyboard = openVKeyboard;
     UI.closeVKeyboard = closeVKeyboard;
     UI.dismissVKeyboard = dismissVKeyboard;

@@ -1,6 +1,6 @@
 {
     "name": "xtivio-pair-server",
-    "version": "103.0.0",
+    "version": "105.0.0",
     "description": "Reference pairing server for Xtivio: short-code pairing, playlist uploads, optional Firebase sign-in.",
     "main": "server.js",
     "scripts": {

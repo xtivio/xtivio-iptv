@@ -1037,6 +1037,10 @@ var UI = (function () {
             wrap = card.querySelector('.vod-card-poster-wrap');
             imgClass = 'vod-card-poster';
         }
+        if (!wrap) {
+            wrap = card.querySelector('.live-epg-logo');      // Live TV list row (logos setting)
+            imgClass = 'live-epg-logo-img';
+        }
         if (!wrap) return;
         var img = new Image();
         img.className = imgClass;
@@ -1085,7 +1089,7 @@ var UI = (function () {
         var vh = 0;
         try { vh = window.innerHeight || document.documentElement.clientHeight || 0; } catch (e) {}
         if (!vh) return;
-        var nodes = document.querySelectorAll('.vod-card[data-logo], .ch-card[data-logo]');
+        var nodes = document.querySelectorAll('.vod-card[data-logo], .ch-card[data-logo], .live-epg-row[data-logo]');
         var loaded = 0;
         for (var i = 0; i < nodes.length && loaded < 60; i++) {
             var r;
@@ -1165,14 +1169,26 @@ var UI = (function () {
     // True for on-demand content: native VOD/series AND Stalker/MAG vod/series
     // (which carry type 'stalker' with a stalkerKind). Used for resume prompts and
     // hero-card routing so Stalker movies/episodes behave like other VOD.
+    // M3U entries sniffed as movies carry type 'movies' (the Movies section lists them by it). The player, the VOD
+    // history and the resume logic know 'vod', so the item that is played (and saved to history) is a copy typed 'vod'.
+    // Without it the player showed the live-TV controls: no Speed, no subtitles, no seek, a Channels button.
+    function vodPlayItem(ch) {
+        if (!ch || (ch.type !== 'movies' && ch.type !== 'movie')) return ch;
+        var c = {}, k;
+        for (k in ch) { if (Object.prototype.hasOwnProperty.call(ch, k)) c[k] = ch[k]; }
+        c.type = 'vod';
+        return c;
+    }
+
     function isVodContent(ch) {
         if (!ch) return false;
-        if (ch.type === 'vod' || ch.type === 'series') return true;
+        if (ch.type === 'vod' || ch.type === 'series' || ch.type === 'movies' || ch.type === 'movie') return true;
         if (ch.type === 'stalker' && (ch.stalkerKind === 'vod' || ch.stalkerKind === 'series')) return true;
         return false;
     }
 
     function tryPlay(ch) {
+        ch = vodPlayItem(ch);
         // Two playback gates, both satisfied by a PIN that opens the short content
         // unlock window (NOT canProtected(), which is the always-strict per-action
         // gate for settings/playlists and can never be satisfied by unlocking — it
@@ -1337,6 +1353,7 @@ var UI = (function () {
     }
 
     function doPlay(ch, shouldResume) {
+        ch = vodPlayItem(ch);
         // Playback restriction gate (mirrors tryPlay). Uses the content unlock
         // window — NOT canProtected() (always-strict for settings; can never be
         // satisfied by unlocking, which caused an infinite doPlay→requirePin loop
@@ -3996,6 +4013,12 @@ var UI = (function () {
             for (var i = livePageStart; i < pageEnd; i++) {
                 chListEl.appendChild(makeLiveChannelRow(currentCatChannels[i], i));
             }
+            // Logos setting: load the first screen of rows now; the rest follow the scroll (schedulePosterScan).
+            try {
+                var logoRows = chListEl.querySelectorAll('.live-epg-row[data-logo]');
+                for (var li = 0; li < logoRows.length && li < 12; li++) lazyLoadLogo(logoRows[li]);
+                if (logoRows.length > 12) schedulePosterScan();
+            } catch (eLg) {}
 
             if (pageEnd < currentCatChannels.length) {
                 var remaining = currentCatChannels.length - pageEnd;
@@ -4202,7 +4225,22 @@ var UI = (function () {
                 arch.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M13 3a9 9 0 00-9 9H1l3.89 3.89.07.14L9 12H6a7 7 0 117 7c-1.93 0-3.68-.79-4.94-2.06l-1.42 1.42A8.954 8.954 0 0013 21a9 9 0 000-18zm-1 5v5l4.28 2.54.72-1.21-3.5-2.08V8H12z"/></svg>';
                 numEl.appendChild(arch);
             }
-            chCol.appendChild(numEl);
+            // Optional logo above the number (Settings: Channel Logos in List View). The logo box starts as a
+            // first-letter tile; the picture is loaded by lazyLoadLogo (first rows after a render, then by scroll).
+            var logoOn = false;
+            try { logoOn = (Store.getSettings().liveListLogos === 'on'); } catch (eLl) {}
+            if (logoOn) {
+                chCol.className += ' has-logo';
+                var numCol = el('div', { 'class': 'live-epg-numcol' });
+                var logoBox = el('div', { 'class': 'live-epg-logo' });
+                logoBox.appendChild(el('div', { 'class': 'live-epg-logo-fb', 'text': (ch.name || '?').charAt(0).toUpperCase() }));
+                numCol.appendChild(logoBox);
+                numCol.appendChild(numEl);
+                chCol.appendChild(numCol);
+                if (ch.logo) row.setAttribute('data-logo', ch.logo);
+            } else {
+                chCol.appendChild(numEl);
+            }
             chCol.appendChild(el('div', { 'class': 'live-epg-ch-name', 'text': (Util.cleanseDisplayName ? Util.cleanseDisplayName(ch.name) : (ch.name || '')) }));
             row.appendChild(chCol);
 

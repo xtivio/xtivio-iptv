@@ -265,13 +265,15 @@ class MainActivity : ComponentActivity() {
 
         // Present a Chrome-on-Android UA so isAndroidWebView() matches (the
         // AndroidBridge object is the primary signal; UA is belt-and-braces).
-        s.userAgentString = (s.userAgentString ?: "") + " XtivioTV/1.0.12"
+        s.userAgentString = (s.userAgentString ?: "") + " XtivioTV/1.0.13"
 
         wv.setLayerType(View.LAYER_TYPE_HARDWARE, null)
         wv.isFocusable = true
         wv.isFocusableInTouchMode = true
 
-        wv.addJavascriptInterface(AndroidBridge(this, exo, { wv }, { currentWebViewScale }), "AndroidBridge")
+        val bridge = AndroidBridge(this, exo, { wv }, { currentWebViewScale })
+        androidBridge = bridge
+        wv.addJavascriptInterface(bridge, "AndroidBridge")
 
         wv.webViewClient = object : WebViewClient() {
             override fun shouldOverrideUrlLoading(
@@ -415,6 +417,21 @@ class MainActivity : ComponentActivity() {
 
     // The manifest lists uiMode in configChanges, so a system light/dark switch does
     // not recreate the Activity; tell the web layer so "Follow System" re-evaluates.
+    // Backup and Restore: results of the file picker and the storage permission go to BackupIo.
+    private var androidBridge: AndroidBridge? = null
+
+    @Suppress("DEPRECATION")
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: android.content.Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        androidBridge?.backupIo?.onActivityResult(requestCode, resultCode, data)
+    }
+
+    @Suppress("DEPRECATION")
+    override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<String>, grantResults: IntArray) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        androidBridge?.backupIo?.onPermissionResult(requestCode)
+    }
+
     override fun onConfigurationChanged(newConfig: android.content.res.Configuration) {
         super.onConfigurationChanged(newConfig)
         webView.post {

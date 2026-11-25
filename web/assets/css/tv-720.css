@@ -60,9 +60,11 @@ html[data-vp="720"] .crash-trail-hint
 { font-size: calc(18px * var(--txt-scale)); }
 
 html[data-vp="720"] .ct-check input[type="checkbox"]:checked::after,
+html[data-vp="720"] .live-epg-ch.has-logo .live-epg-ch-num,
 html[data-vp="720"] .crash-trail-box
 { font-size: calc(20px * var(--txt-scale)); }
 
+html[data-vp="720"] .live-epg-logo-fb,
 html[data-vp="720"] .crash-trail-title,
 html[data-vp="720"] .cu-note
 { font-size: calc(22px * var(--txt-scale)); }
